@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#060812">
+<title>超频幸存者 · OVERCLOCK SURVIVORS · 无尽炼狱</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+  <div id="fx-overlay"></div>
+
+  <!-- ============ 战斗 HUD ============ -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-left">
+        <div class="stat-row"><span id="lv-text" class="lv-badge">LV 1</span><span id="hp-text" class="stat-num">100 / 100</span></div>
+        <div class="bar hp-bar"><div id="hp-fill" class="bar-fill"></div></div>
+        <div class="bar xp-bar"><div id="xp-fill" class="bar-fill"></div><span id="xp-text" class="xp-label">0 / 8</span></div>
+      </div>
+      <div class="hud-center">
+        <div id="time-text" class="time-text">00:00</div>
+        <div id="floor-text" class="floor-text">第 1 层 <em>无尽炼狱</em></div>
+        <div id="wave-text" class="wave-text">准备波 · 首领倒计时 42s</div>
+        <div class="stage-row">
+          <span id="stage-sub" class="stage-sub">INIT</span>
+          <div class="bar stage-bar"><div id="stage-fill" class="bar-fill"></div></div>
+          <span id="stage-name" class="stage-name">启动区</span>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="kv"><span>击杀</span><b id="kill-text">0</b></div>
+        <div class="kv"><span>分数</span><b id="score-text">0</b></div>
+        <div class="kv"><span>难度</span><b id="diff-text">—</b></div>
+        <div class="kv dim"><span>契约</span><b id="contract-text">0</b></div>
+        <div class="kv dim"><span>FPS</span><b id="fps-text">60</b></div>
+        <div class="kv dim"><span>帧时</span><b id="ft-text">16.7ms</b></div>
+      </div>
+    </div>
+
+    <div id="daily-hud" class="daily-hud hidden">
+      <span class="dh-tag">📅 今日挑战</span>
+      <span id="dh-goal" class="dh-goal">目标 第 3 层</span>
+      <span id="dh-progress" class="dh-progress">0 / 3</span>
+      <span id="dh-status" class="dh-status">进行中</span>
+    </div>
+
+    <div id="boss-hud" class="boss-hud hidden">
+      <div class="boss-name">
+        <span class="boss-tag">⚠ BOSS</span>
+        <span id="boss-floor" class="boss-floor">L1</span>
+        <span id="boss-name">首领</span>
+        <span id="boss-hp-text" class="boss-hp-text">100%</span>
+      </div>
+      <div class="bar boss-bar"><div id="boss-fill" class="bar-fill"></div></div>
+      <div id="boss-affix" class="boss-affix"></div>
+    </div>
+
+    <div id="event-banner" class="event-banner hidden">
+      <div class="ev-tag">EVENT</div>
+      <div class="ev-main"><b id="event-name">数据洪流</b><span id="event-text">敌群密度激增</span></div>
+      <div class="ev-bar"><div id="event-fill"></div></div>
+    </div>
+
+    <div id="combo-box" class="combo-box hidden">
+      <span id="combo-num">0</span><small>COMBO</small><em id="combo-mul">x1.0</em>
+    </div>
+
+    <div id="synergy-bar" class="synergy-bar"></div>
+    <div id="augment-list" class="augment-list"></div>
+    <div id="ult-ready-hint" class="ult-ready-hint hidden">Q // EMP 过载就绪 · 按 Q 清屏</div>
+
+    <div class="hud-bottom">
+      <div id="weapon-list" class="weapon-list"></div>
+      <div class="bottom-right">
+        <div id="energy-box" class="energy-box">
+          <div class="dash-head"><span>EMP 过载</span><span id="energy-label">0%</span></div>
+          <div class="bar energy-bar"><div id="energy-fill" class="bar-fill"></div></div>
+          <div class="energy-hint">Q 释放 · 满能量清屏并减速</div>
+        </div>
+        <div class="dash-box">
+          <div class="dash-head"><span>冲刺</span><span id="dash-label">就绪</span></div>
+          <div class="bar dash-bar"><div id="dash-fill" class="bar-fill"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="danger-vignette" class="danger-vignette"></div>
+
+  <!-- v4：首领入场全屏警报 / 通关层横幅 -->
+  <div id="boss-warning" class="boss-warning hidden">
+    <div class="bw-inner">
+      <div class="bw-tag">⚠ WARNING // FLOOR <span id="bw-floor">1</span> BOSS</div>
+      <div id="bw-name" class="bw-name">首领来袭</div>
+      <div class="bw-sub"><span id="bw-hp">0</span> HP · 强度 ×<span id="bw-scale">1</span> · 一层比一层强</div>
+      <div id="bw-affix" class="bw-affix"></div>
+    </div>
+  </div>
+  <div id="floor-banner" class="floor-banner hidden">
+    <div class="fb-inner">
+      <div class="fb-tag">FLOOR CLEARED</div>
+      <div id="fb-title" class="fb-title">进入第 2 层</div>
+      <div class="fb-sub">敌群与首领强化 · 回血 / 能量 / 稀有宝箱已投放</div>
+    </div>
+  </div>
+  <div id="toast"></div>
+
+  <div id="loot-popup" class="loot-popup hidden">
+    <div class="loot-title">宝箱开启</div>
+    <div id="loot-list"></div>
+  </div>
+
+  <!-- ============ 4399 风格登录门户 ============ -->
+  <section id="screen-portal" class="screen portal-screen">
+    <div class="portal-wrap">
+      <header class="portal-head">
+        <div class="p-brand"><span class="p-brand-cn">超频幸存者</span><span class="p-brand-en">OVERCLOCK SURVIVORS · 无尽炼狱</span></div>
+        <div class="p-head-right"><span class="p-online">● 在线 <b id="p-online">12,486</b></span><span class="p-ver">V6.0</span></div>
+      </header>
+      <div class="portal-main">
+        <div class="portal-left">
+          <div class="p-hero">
+            <div class="p-hero-tag">◆ 热门 · 无尽挑战 · 海克斯构筑</div>
+            <h2>一层比一层狠<br><em>你能撑到第几层？</em></h2>
+            <p>登录档案记录最深层数与成就，每日签到领开局加成，自选挑战难度；每层击破首领后签订「炼狱契约」，用诅咒换爆发。</p>
+            <div class="p-feats"><span>✦ 27 项强化</span><span>☠ 逐层首领词缀</span><span>⚔ 8 种炼狱契约</span><span>∞ 无尽层</span></div>
+          </div>
+          <div class="p-box p-notice">
+            <h3>📢 最新公告 <span>NEWS</span></h3>
+            <ul id="p-notice-list"></ul>
+          </div>
+          <div class="p-box p-rank">
+            <h3>🏆 本机排行榜 <span>TOP 5 · 最深层数</span></h3>
+            <div id="p-rank-list"></div>
+          </div>
+          <div class="p-box p-daily">
+            <h3>📅 今日挑战 <span id="p-daily-date">DAILY</span></h3>
+            <div id="p-daily-info" class="p-daily-info"></div>
+            <div id="p-daily-mods" class="p-daily-mods"></div>
+            <div class="p-daily-foot"><span id="p-daily-mine">尚未挑战</span><button id="p-daily-go" type="button" class="p-btn p-btn-daily">接受挑战</button></div>
+            <div id="p-daily-board" class="p-daily-board"></div>
+          </div>
+          <div class="p-box p-codex">
+            <h3>🧬 超武进化图鉴 <span id="p-codex-progress">0 / 6</span></h3>
+            <div id="p-codex-list" class="p-codex-list"></div>
+          </div>
+        </div>
+        <div class="portal-right">
+          <div id="p-auth" class="p-card">
+            <div class="p-tabs">
+              <button type="button" data-tab="login" class="on">账号登录</button>
+              <button type="button" data-tab="reg">注册新号</button>
+            </div>
+            <form id="p-form-login" autocomplete="off">
+              <label>账号昵称<input id="p-login-name" type="text" placeholder="输入昵称" maxlength="12"></label>
+              <label>密码<input id="p-login-pass" type="password" placeholder="输入密码" maxlength="20"></label>
+              <div class="p-remember"><label><input id="p-remember" type="checkbox" checked> 记住账号</label><span id="p-login-msg" class="p-msg"></span></div>
+              <button id="p-login-btn" type="submit" class="p-btn p-btn-primary">登 录</button>
+            </form>
+            <form id="p-form-reg" class="hidden" autocomplete="off">
+              <label>昵称（2~12 字）<input id="p-reg-name" type="text" placeholder="给自己起个名" maxlength="12"></label>
+              <label>密码（至少 4 位）<input id="p-reg-pass" type="password" placeholder="设置密码" maxlength="20"></label>
+              <label>确认密码<input id="p-reg-pass2" type="password" placeholder="再输一次" maxlength="20"></label>
+              <div class="p-avatar-label">选择头像</div>
+              <div id="p-avatar-list" class="p-avatar-list"></div>
+              <span id="p-reg-msg" class="p-msg"></span>
+              <button id="p-reg-btn" type="submit" class="p-btn p-btn-primary">注 册 并 进 入</button>
+            </form>
+            <button id="p-guest" type="button" class="p-btn p-btn-ghost">🎮 游客试玩 · 无需注册</button>
+            <p class="p-tip">本地存档 · 不联网 · 密码仅以摘要保存在此设备，可随时切换账号</p>
+          </div>
+          <div id="p-user" class="p-card hidden">
+            <div class="p-userhead">
+              <div id="p-avatar" class="p-avatar">◈</div>
+              <div class="p-uname"><b id="p-name">玩家</b><span id="p-title">新晋特工</span></div>
+              <button id="p-logout" type="button" class="p-mini">退出</button>
+            </div>
+            <div id="p-userstats" class="p-userstats"></div>
+            <div class="p-signrow">
+              <button id="p-sign-btn" type="button" class="p-btn p-btn-sign">每日签到</button>
+              <span id="p-sign-info" class="p-sign-info"></span>
+            </div>
+            <div class="p-section"><label>挑战难度 <em>越难分数越高</em></label><div id="p-diff-list" class="p-diff-list"></div><div id="p-diff-desc" class="p-diff-desc"></div></div>
+            <div class="p-section"><label>成就 <span id="p-ach-count"></span></label><div id="p-ach-list" class="p-ach-list"></div></div>
+            <div class="p-lab-entry">
+              <button id="p-lab-toggle" type="button" class="p-btn p-btn-lab">⚗ 研究所 <span id="p-lab-cores">0 枚核心</span></button>
+            </div>
+            <div id="p-lab-panel" class="p-lab-panel hidden">
+              <div class="p-lab-head"><b>超频研究所</b><span>用结算获得的超频核心兑换永久强化，对所有账号档案长期生效</span></div>
+              <div id="p-lab-list" class="p-lab-list"></div>
+              <div id="p-lab-msg" class="p-msg"></div>
+            </div>
+            <button id="p-play" type="button" class="p-btn p-btn-play">▶ 开始游戏</button>
+            <button id="p-switch" type="button" class="p-link">切换账号 / 返回登录</button>
+          </div>
+        </div>
+      </div>
+      <footer class="portal-foot"><span>© OVERCLOCK SURVIVORS · 本地单机版</span><span>WASD 移动 · SPACE 冲刺 · Q EMP · 1/2/3 选强化 · R 重掷 · P 暂停</span></footer>
+    </div>
+  </section>
+
+  <!-- ============ 层间炼狱契约 ============ -->
+  <section id="screen-contract" class="screen hidden">
+    <div class="panel wide">
+      <div class="eyebrow">INFERNAL PACT // FLOOR <span id="contract-floor">2</span></div>
+      <h2>炼狱契约</h2>
+      <p class="sub">每层击破首领后签订一张：接受一条诅咒，换一份足以改变构筑的收益（本局永久生效，可叠加）</p>
+      <div id="contract-cards" class="cards"></div>
+      <div class="foot-hint">按 1 / 2 / 3 签订 · <button id="btn-skip-contract" class="reroll-btn" type="button">跳过契约 · 稳妥推进（无收益）</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 主菜单 ============ -->
+  <section id="screen-menu" class="screen">
+    <div class="menu-wrap">
+      <div class="eyebrow">ARCADE // ENDLESS INFERNO PROTOCOL v4.0</div>
+      <h1 class="logo"><span class="logo-cn">超频幸存者</span><span class="logo-en">OVERCLOCK SURVIVORS</span></h1>
+      <p class="tagline">无尽炼狱 · 没有终点，只有一层比一层更强的首领<br>每次升级三选一「海克斯强化」，抽出自动拾取 / 击杀吸血 / 超武蓝图，构筑属于你的一局</p>
+      <div id="best-line" class="best-line">最高分 0 · 最深 1 层 · 最长存活 00:00</div>
+      <div class="menu-btns">
+        <button id="btn-start" class="btn btn-primary">开始游戏 <span class="key-hint">ENTER</span></button>
+        <button id="btn-help" class="btn">操作说明</button>
+        <button id="btn-settings" class="btn">设置</button>
+        <button id="btn-account" class="btn">账号中心 / 切换难度</button>
+      </div>
+      <div class="menu-foot">WASD 移动 · SPACE 冲刺 · Q 释放 EMP · 1/2/3 选强化 · R 重掷 · P 暂停</div>
+    </div>
+  </section>
+
+  <!-- ============ 操作说明 ============ -->
+  <section id="screen-help" class="screen hidden">
+    <div class="panel">
+      <h2>操作说明</h2>
+      <div class="help-grid">
+        <div class="help-item"><b>WASD / ↑↓←→</b><span>移动，武器会全自动锁定最近目标开火</span></div>
+        <div class="help-item"><b>SPACE</b><span>冲刺：短暂无敌并甩开敌群，有冷却</span></div>
+        <div class="help-item"><b>Q</b><span>EMP 过载：能量条满 100% 时按 Q，清屏伤害、清弹幕、敌人减速。抽到「绝对过载」会自动释放</span></div>
+        <div class="help-item"><b>1 / 2 / 3</b><span>每次升级三选一「海克斯强化」：银色 / 金色 / 棱彩，等级越高越容易出高品质</span></div>
+        <div class="help-item"><b>协同构筑</b><span>已拿到的强化会提高相关强化出现率（卡面显示「协同」）；连拿 6 次没出棱彩则保底必出</span></div>
+        <div class="help-item"><b>续航与拾取</b><span>「全域牵引」自动吸全屏经验/宝箱/道具，「血契协议」击杀回血，「纳米修复 / 不死协议」提高回复</span></div>
+        <div class="help-item"><b>反围攻</b><span>「脉冲护环」「奇点领域」「连锁湮灭」会自动清理贴身敌群，第三关不再被围死</span></div>
+        <div class="help-item"><b>力场与超武</b><span>绿色力场回血 + 攻速 + 充能；「超武蓝图」可直接进化武器，不必再凑指定被动</span></div>
+        <div class="help-item"><b>无尽层</b><span>没有 5 分钟通关，层数无限。每层先打准备波，随后强制出现该层首领，击破才进下一层；结算记录「抵达层数」与最深纪录</span></div>
+        <div class="help-item"><b>每层首领</b><span>出场有全屏警报、警示音与常驻血条；血量、弹幕、召唤、移速逐层递增，半血与残血各进一个狂暴阶段，单次伤害有上限不会被瞬秒</span></div>
+        <div class="help-item"><b>逐层强化</b><span>小怪单体生命 / 伤害 / 移速随层数成长，第 4 层起必须认真走位；场上数量仍受上限约束，不会滚雪球卡顿</span></div>
+        <div class="help-item"><b>登录档案</b><span>启动时的门户可注册 / 登录 / 游客试玩；每个账号独立记录最深层数、最高分、成就与设置，每日签到给开局加成</span></div>
+        <div class="help-item"><b>挑战难度</b><span>门户里选 标准 / 精英 / 炼狱 / 无尽噩梦，敌人与首领强度、刷怪密度、准备波时长与分数倍率同步变化</span></div>
+        <div class="help-item"><b>炼狱契约</b><span>击破首领进入下一层时三选一：接受诅咒换强力收益（伤害、分数、暴击、宝箱…），本局永久叠加；也可跳过稳妥推进</span></div>
+        <div class="help-item"><b>首领词缀</b><span>第 2 层起首领附带随机词缀：壁垒减伤 / 噬主回血 / 崩解弹幕 / 狂血加速 / 群噬召唤 / 蚀界灼烧，层数越深词缀越多</span></div>
+        <div class="help-item"><b>P / ESC</b><span>暂停游戏；触屏用左侧摇杆 + 右下冲刺 / EMP 按钮</span></div>
+      </div>
+      <div class="help-note">无尽炼狱没有通关：只有阵亡才结束，越深越强。每通过一层会回复生命、补充能量、投放稀有宝箱并签订契约；卡顿时自动降低特效负载。看看你能到第几层。</div>
+      <button id="btn-help-back" class="btn btn-primary">返回</button>
+    </div>
+  </section>
+
+  <!-- ============ 设置 ============ -->
+  <section id="screen-settings" class="screen hidden">
+    <div class="panel narrow">
+      <h2>设置</h2>
+      <label class="set-row"><span>音量</span><input id="set-volume" type="range" min="0" max="100" value="60"><b id="set-volume-val">60%</b></label>
+      <label class="set-row"><span>画质</span><select id="set-quality"><option value="high">高 · 完整辉光 + Bloom</option><option value="medium">中 · 均衡</option><option value="low">低 · 省电（关闭泛光）</option></select></label>
+      <label class="set-row"><span>辉光泛光</span><input id="set-bloom" type="checkbox" checked></label>
+      <label class="set-row"><span>目标帧率</span><select id="set-fps"><option value="auto">自动 · 流畅优先（推荐）</option><option value="60">60 FPS · 省电稳定</option><option value="90">90 FPS · 均衡</option><option value="120">120 FPS · 高刷</option><option value="144">144 FPS · 极致</option></select></label>
+      <label class="set-row"><span>屏幕震动</span><input id="set-shake" type="checkbox" checked></label>
+      <p id="perf-hint" class="help-note">自动档会按真实帧时间动态调整渲染分辨率与泛光，密集场景也不掉帧。高刷档需显示器支持（60Hz 屏无法超过 60）。所有音效由 Web Audio 实时合成；设置自动保存。</p>
+      <button id="btn-settings-back" class="btn btn-primary">返回</button>
+    </div>
+  </section>
+
+  <!-- ============ 升级三选一 ============ -->
+  <section id="screen-levelup" class="screen hidden">
+    <div class="panel wide">
+      <div class="eyebrow">HEXTECH AUGMENT // 银色 · 金色 · 棱彩 · 无尽</div>
+      <h2 id="levelup-title">海克斯强化 · LV 2</h2>
+      <p class="sub">选择一项强化，构筑这一局</p>
+      <div id="upgrade-cards" class="cards"></div>
+      <div class="foot-hint">按 1 / 2 / 3 选择 · <button id="btn-reroll" class="reroll-btn" type="button">R 重掷（剩 <span id="reroll-count">2</span> 次）</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 暂停 ============ -->
+  <section id="screen-pause" class="screen hidden">
+    <div class="panel narrow center">
+      <h2>已暂停</h2>
+      <p class="sub">系统待机中</p>
+      <div class="stack-btns">
+        <button id="btn-resume" class="btn btn-primary">继续游戏</button>
+        <button id="btn-restart" class="btn">重新开始</button>
+        <button id="btn-quit" class="btn btn-ghost">返回主菜单</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 结算 ============ -->
+  <section id="screen-result" class="screen hidden">
+    <div class="panel narrow center">
+      <div id="result-badge" class="result-badge">RUN TERMINATED</div>
+      <h2 id="result-title">挑战终止</h2>
+      <p id="result-sub" class="sub">无尽炼狱 · 数据已归档</p>
+      <div id="result-stats" class="result-stats"></div>
+      <div id="result-build" class="result-build"></div>
+      <div class="stack-btns">
+        <button id="btn-again" class="btn btn-primary">再来一局 <span class="key-hint">ENTER</span></button>
+        <button id="btn-menu" class="btn">返回主菜单</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 触屏控件 ============ -->
+  <div id="touch-controls" class="hidden">
+    <div id="joystick"><div id="joystick-knob"></div></div>
+    <button id="btn-ult-touch">EMP</button>
+    <button id="btn-dash-touch">冲刺</button>
+  </div>
+
+  <div id="autotest-out" style="display:none"></div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/account.js"></script>
+<script src="js/lab.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/content.js"></script>
+<script src="js/game.js"></script>
+<script src="js/visuals.js"></script>
+<script src="js/systems.js"></script>
+<script src="js/augments.js"></script>
+<script src="js/synergy.js"></script>
+<script src="js/meta.js"></script>
+<script src="js/daily.js"></script>
+<script src="js/perf.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/portal.js"></script>
+</body>
+</html>
