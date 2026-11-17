@@ -372,8 +372,11 @@
     musicArmed = true;
     try {
       var st = (NS.U && NS.U.Save ? (NS.U.Save.peek ? NS.U.Save.peek() : NS.U.Save.load().settings) : null) || {};
-      NS.Audio.init(st.volume, st.musicVol);
+      NS.Audio.init(st.volume, st.musicVol == null ? 1 : st.musicVol, st.sfxVol == null ? 1 : st.sfxVol);
+      NS.Audio.setLoudness(st.loudness || 'max');
+      NS.Audio.setSfxVolume(st.sfxVol == null ? 1 : st.sfxVol);
       NS.Audio.setMusicEnabled(st.musicOn !== false);
+      if (NS.game && NS.game.setFxPower) NS.game.setFxPower(st.fxPower == null ? 2 : st.fxPower);
       NS.Audio.resume();
       if (P.isOpen() || (NS.game && NS.game.state === 'menu')) NS.Audio.music('menu');
     } catch (e) { /* 音频异常不影响门户 */ }

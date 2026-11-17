@@ -12,8 +12,8 @@
   var A = NS.Audio = {};
   var U = NS.U;
 
-  var ctx = null, master = null, sfxBus = null, musicBus = null;
-  var volume = 0.6, musicVol = 0.7, musicOn = true;
+  var ctx = null, master = null, sfxBus = null, musicBus = null, makeup = null;
+  var volume = 0.85, musicVol = 0.9, sfxVol = 1, musicOn = true;
   var muted = false;          /* 全局静音（M 键 / 切后台），只压 master，不丢各轨音量设置 */
   var ready = false, enabled = true;
   var sfxPaused = false;      /* 只静音音效（升级三选一时用，音乐继续） */
@@ -21,28 +21,42 @@
   var ducked = false;
   var lastAt = Object.create(null);
 
+  /* v11 响度整改：程序化音原本电平极低（0.02~0.1），叠加两级衰减后几乎听不见。
+     现在分三层抬：① 音效/乐器原始电平抬升 ② 总线抬升 ③ 压缩后 makeup 增益，
+     再由「响度增强」三档统一乘在 master 上。默认 0.85 × 增强档，实际感知响度约为旧版 6~8 倍。 */
+  var SFX_BOOST = 2.6;        /* 音效表内所有 tone/noise 电平倍数 */
+  var MUSIC_BOOST = 2.0;      /* 音乐乐器电平倍数 */
+  var LOUD = { normal: 1.0, loud: 1.7, max: 2.6 };
+  var loudness = 'loud';
+  function loudMul() { return LOUD[loudness] || LOUD.loud; }
+
   /* ---------------- 初始化 ---------------- */
-  A.init = function (vol, mv) {
+  A.init = function (vol, mv, sv) {
     if (vol != null) volume = vol;
     if (mv != null) musicVol = mv;
+    if (sv != null) sfxVol = sv;
     if (ready) { applyGain(); return; }
     var AC = root.AudioContext || root.webkitAudioContext;
     if (!AC) { enabled = false; ready = true; return; }
     try {
       ctx = new AC();
-      /* master → 压缩器 → 输出：抬总音量后仍不削顶爆音 */
+      /* master → 压缩器 → makeup → 输出：先压峰值再整体补足，响度上去了也不会削顶爆音 */
       master = ctx.createGain();
-      master.gain.value = muted ? 0 : volume * 1.15;
+      master.gain.value = muted ? 0 : volume * 2.2 * loudMul();
       var comp = ctx.createDynamicsCompressor();
+      /* 阈值不能压得太低，否则「越响越被压回去」；这里只削尖峰，响度靠 makeup 补 */
       comp.threshold.value = -14;
-      comp.knee.value = 22;
-      comp.ratio.value = 6;
-      comp.attack.value = 0.004;
-      comp.release.value = 0.22;
+      comp.knee.value = 18;
+      comp.ratio.value = 8;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.2;
+      makeup = ctx.createGain();
+      makeup.gain.value = 2.2;
       master.connect(comp);
-      comp.connect(ctx.destination);
+      comp.connect(makeup);
+      makeup.connect(ctx.destination);
       sfxBus = ctx.createGain();
-      sfxBus.gain.value = 1.45;
+      sfxBus.gain.value = 2.2 * sfxVol;
       sfxBus.connect(master);
       musicBus = ctx.createGain();
       musicBus.gain.value = musicGain();
@@ -53,20 +67,25 @@
 
   function musicGain() {
     if (!musicOn) return 0;
-    /* 之前是 musicVol*0.55，两级衰减后几乎听不见；现在给足音乐总线电平 */
-    return musicVol * 1.0 * (ducked ? 0.34 : 1);
+    /* 音乐总线不再因子链路衰减，给足电平，压低只在 duck 时发生 */
+    return musicVol * 1.25 * (ducked ? 0.34 : 1);
   }
   function applyGain() {
-    if (master) master.gain.value = muted ? 0 : volume * 1.15;
+    if (master) master.gain.value = muted ? 0 : volume * 2.2 * loudMul();
     if (musicBus) musicBus.gain.value = musicGain();
+    if (sfxBus) sfxBus.gain.value = 2.2 * sfxVol;
   }
 
   A.resume = function () {
     if (!ctx) return;
     if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
   };
-  A.setVolume = function (v) { volume = v; applyGain(); };
+  A.setVolume = function (v) { volume = Math.max(0, Math.min(1, v)); applyGain(); };
   A.setMusicVolume = function (v) { musicVol = Math.max(0, Math.min(1, v)); applyGain(); };
+  A.setSfxVolume = function (v) { sfxVol = Math.max(0, Math.min(1, v)); applyGain(); };
+  A.setLoudness = function (id) { loudness = LOUD[id] ? id : 'loud'; applyGain(); return loudness; };
+  A.getLoudness = function () { return loudness; };
+  A.levels = function () { return { volume: volume, musicVol: musicVol, sfxVol: sfxVol, loudness: loudness, muted: muted }; };
   A.setMusicEnabled = function (on) {
     musicOn = !!on; applyGain();
     if (!musicOn) stopScheduler();
@@ -105,10 +124,11 @@
   }
   function tone(freq, dur, type, vol, slideTo, delay) {
     if (!ctx || !enabled) return;
-    osc(freq, dur, type, vol, slideTo, ctx.currentTime + (delay || 0), sfxBus);
+    osc(freq, dur, type, vol * SFX_BOOST, slideTo, ctx.currentTime + (delay || 0), sfxBus);
   }
   function noise(dur, vol, cutoff, delay, type, bus) {
     if (!ctx || !enabled) return;
+    vol = vol * SFX_BOOST;
     var t = ctx.currentTime + (delay || 0);
     var len = Math.max(1, Math.floor(ctx.sampleRate * dur));
     var buf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -188,9 +208,17 @@
       tone(110, 0.55, 'sine', 0.060, 55);
       noise(0.34, 0.032, 7200, 0, 'highpass');
     },
-    reroll:   function () { noise(0.10, 0.03, 4200, 0, 'highpass'); tone(760, 0.10, 'square', 0.028, 420); }
+    reroll:   function () { noise(0.10, 0.03, 4200, 0, 'highpass'); tone(760, 0.10, 'square', 0.028, 420); },
+    /* ---- v11 UI 交互（每次点击 / 开关 / 切换都有明确反馈） ---- */
+    uiTap:    function () { tone(820, 0.05, 'square', 0.055, 1120); noise(0.028, 0.022, 5600, 0, 'highpass'); },
+    uiOpen:   function () { tone(420, 0.10, 'triangle', 0.055, 900); tone(700, 0.13, 'sine', 0.04, 1180, 0.05); noise(0.10, 0.018, 5200, 0, 'highpass'); },
+    uiClose:  function () { tone(700, 0.09, 'triangle', 0.05, 360); noise(0.06, 0.016, 3600, 0, 'highpass'); },
+    uiHover:  function () { tone(1080, 0.028, 'sine', 0.022, 1320); },
+    uiStep:   function () { tone(620, 0.04, 'square', 0.045, 880); },
+    uiBig:    function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.16, 'triangle', 0.05, null, i * 0.05); }); noise(0.14, 0.03, 6400, 0, 'highpass'); },
+    uiDeny:   function () { tone(220, 0.12, 'square', 0.06, 150); }
   };
-  var THROTTLE = { shoot: 0.045, hit: 0.035, kill: 0.055, pickup: 0.045, explode: 0.09, combo: 0.07, shield: 0.06, click: 0.04, hover: 0.06, heart: 0.34 };
+  var THROTTLE = { shoot: 0.045, hit: 0.035, kill: 0.055, pickup: 0.045, explode: 0.09, combo: 0.07, shield: 0.06, click: 0.04, hover: 0.06, heart: 0.34, uiTap: 0.035, uiHover: 0.05, uiStep: 0.04 };
 
   A.play = function (name, arg) {
     if (!ctx || !enabled || allPaused || sfxPaused) return;
@@ -199,30 +227,66 @@
     var now = ctx.currentTime, gap = THROTTLE[name] || 0;
     if (gap && lastAt[name] && now - lastAt[name] < gap) return;
     lastAt[name] = now;
+    A._lastMs = Date.now();
     try { f(arg); } catch (e) { /* 音频异常绝不影响游戏 */ }
   };
+  /* 最近是否刚响过音效：给「通用点击音」去重，避免与专属音效叠在一起 */
+  A.recent = function (ms) { return !!A._lastMs && (Date.now() - A._lastMs) < (ms || 80); };
 
   /* ---------------- 背景音乐 ---------------- */
-  /* 相对 A2(110Hz) 的半音偏移，四小节循环 */
+  /* v11：从 3 首单循环扩到 5 首 + 每首 4 段变奏。
+   * 每首 = 和声进行(roots) + 低音型 + 琶音型 + 主旋律(mel) + 鼓型，
+   * 每 4 小节插入 fill（军鼓过门 / 镲片 / 八度跳进），避免「一直重复同一句」。 */
   var TRACKS = {
-    menu:   { bpm: 84,  bass: 0, drums: 0, pad: 1, arp: 1, roots: [0, -4, 3, -2] },
-    battle: { bpm: 132, bass: 1, drums: 1, pad: 1, arp: 1, roots: [0, -4, 3, -2] },
-    boss:   { bpm: 150, bass: 2, drums: 2, pad: 1, arp: 1, roots: [0, -2, -4, -5] }
+    /* 门户 / 结算：慢速氛围，无鼓，旋律留白多 */
+    menu: {
+      bpm: 78, bass: 0, drums: 0, pad: 1, arp: 1, mel: 1,
+      roots: [0, -4, 3, -2], arpPat: [0, 7, 12, 15, 12, 7, 3, 7],
+      melPat: [12, null, null, 15, null, 19, null, null, 17, null, 15, null, 12, null, null, null],
+      melType: 'triangle', melVol: 0.10
+    },
+    /* 局内 1~3 层 */
+    battle: {
+      bpm: 132, bass: 1, drums: 1, pad: 1, arp: 1, mel: 1,
+      roots: [0, -4, 3, -2], arpPat: [0, 7, 12, 15, 12, 7, 3, 7],
+      melPat: [12, null, 15, 19, null, 15, 12, null, 10, null, 12, 15, null, 12, 10, null],
+      melType: 'square', melVol: 0.075
+    },
+    /* 局内 4 层起：升调 + 更快 + 加切分低音与密集踩镲 */
+    battle2: {
+      bpm: 142, bass: 3, drums: 3, pad: 1, arp: 1, mel: 1,
+      roots: [2, -2, 5, 0], arpPat: [0, 7, 10, 12, 15, 12, 10, 7],
+      melPat: [14, null, 17, null, 19, 17, 14, null, 12, 14, null, 17, 19, null, 17, null],
+      melType: 'square', melVol: 0.08
+    },
+    /* 首领 1~5 层：重鼓 + 半音冲突 */
+    boss: {
+      bpm: 150, bass: 2, drums: 2, pad: 1, arp: 1, mel: 1,
+      roots: [0, -2, -4, -5], arpPat: [0, 6, 12, 15, 12, 6, 1, 6],
+      melPat: [11, null, 12, null, 15, null, 11, 10, null, 8, null, 7, null, 6, null, null],
+      melType: 'sawtooth', melVol: 0.055
+    },
+    /* 首领 6 层起：更快的双踩 + 上行半音阶，压迫感最强 */
+    boss2: {
+      bpm: 164, bass: 4, drums: 4, pad: 1, arp: 1, mel: 1,
+      roots: [1, -1, -3, -4], arpPat: [0, 6, 11, 13, 18, 13, 11, 6],
+      melPat: [12, 13, 14, 15, null, 18, 17, 16, null, 15, 14, 13, null, 12, 11, null],
+      melType: 'sawtooth', melVol: 0.06
+    }
   };
-  var ARP = [0, 7, 12, 15, 12, 7, 3, 7];
   var curTrack = null, schedTimer = null, stepIdx = 0, nextTime = 0;
   var LOOKAHEAD = 0.28, TICK_MS = 40;
 
   function mtone(freq, dur, type, vol, when, slideTo) {
-    osc(freq, dur, type, vol, slideTo, when, musicBus);
+    osc(freq, dur, type, vol * MUSIC_BOOST, slideTo, when, musicBus);
   }
   function kick(when, vol) {
     var o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'sine';
-    o.frequency.setValueAtTime(150, when);
-    o.frequency.exponentialRampToValueAtTime(42, when + 0.14);
+    o.frequency.setValueAtTime(170, when);
+    o.frequency.exponentialRampToValueAtTime(40, when + 0.15);
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(vol || 0.34, when + 0.01);
+    g.gain.exponentialRampToValueAtTime((vol || 0.34) * MUSIC_BOOST, when + 0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.22);
     o.connect(g); g.connect(musicBus);
     o.start(when); o.stop(when + 0.26);
@@ -235,59 +299,105 @@
     var src = ctx.createBufferSource(); src.buffer = buf;
     var f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1400;
     var g = ctx.createGain();
-    g.gain.setValueAtTime(vol || 0.11, when);
+    g.gain.setValueAtTime((vol || 0.11) * MUSIC_BOOST, when);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.14);
     src.connect(f); f.connect(g); g.connect(musicBus);
     src.start(when); src.stop(when + 0.16);
   }
-  function hat(when, vol) {
-    var len = Math.floor(ctx.sampleRate * 0.04);
+  function hat(when, vol, open) {
+    var dur = open ? 0.16 : 0.04;
+    var len = Math.floor(ctx.sampleRate * dur);
     var buf = ctx.createBuffer(1, len, ctx.sampleRate);
     var d = buf.getChannelData(0);
     for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
     var src = ctx.createBufferSource(); src.buffer = buf;
     var f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7600;
     var g = ctx.createGain();
-    g.gain.setValueAtTime(vol || 0.032, when);
-    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.045);
+    g.gain.setValueAtTime((vol || 0.032) * MUSIC_BOOST, when);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     src.connect(f); f.connect(g); g.connect(musicBus);
-    src.start(when); src.stop(when + 0.06);
+    src.start(when); src.stop(when + dur + 0.02);
+  }
+  function crash(when, vol) {
+    var len = Math.floor(ctx.sampleRate * 0.5);
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.6);
+    var src = ctx.createBufferSource(); src.buffer = buf;
+    var f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 5200; f.Q.value = 0.7;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime((vol || 0.10) * MUSIC_BOOST, when);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.5);
+    src.connect(f); f.connect(g); g.connect(musicBus);
+    src.start(when); src.stop(when + 0.52);
   }
 
   function scheduleStep(step, when) {
     var tr = TRACKS[curTrack];
     if (!tr) return;
-    var bar = Math.floor(step / 16) % tr.roots.length;
+    var barNo = Math.floor(step / 16);
+    var bar = barNo % tr.roots.length;
     var s = step % 16;
     var root = tr.roots[bar];
     var fRoot = 110 * Math.pow(2, root / 12);
     var beat = 60 / tr.bpm;
+    var phrasePos = barNo % 4;          /* 4 小节一句，最后小节做过门 */
 
-    if (tr.bass) {
-      if (tr.bass === 2) {
-        if (s % 2 === 0) mtone(fRoot, s % 8 === 0 ? 0.16 : 0.08, 'sawtooth', s % 8 === 0 ? 0.15 : 0.09, when);
-      } else if (s % 4 === 0 || s === 6 || s === 14) {
-        mtone(fRoot, 0.20, 'sawtooth', 0.13, when);
-      }
+    /* 低音：0=无 1=四分 2=八分锯齿 3=切分 4=双踩 */
+    if (tr.bass === 1) {
+      if (s % 4 === 0 || s === 6 || s === 14) mtone(fRoot, 0.20, 'sawtooth', 0.13, when);
+    } else if (tr.bass === 2) {
+      if (s % 2 === 0) mtone(fRoot, s % 8 === 0 ? 0.16 : 0.08, 'sawtooth', s % 8 === 0 ? 0.15 : 0.09, when);
+    } else if (tr.bass === 3) {
+      if (s % 4 === 0) mtone(fRoot, 0.18, 'sawtooth', 0.16, when);
+      if (s === 6 || s === 11 || s === 14) mtone(fRoot * 2, 0.09, 'sawtooth', 0.085, when);
+    } else if (tr.bass === 4) {
+      if (s % 2 === 0) mtone(fRoot * (s % 8 === 0 ? 1 : 2), 0.09, 'sawtooth', 0.13, when);
+      if (s % 8 === 4) mtone(fRoot * 1.5, 0.07, 'square', 0.07, when);
     }
+
+    /* 铺底：每小节换和弦，第三音做大小调色彩差 */
     if (tr.pad && s === 0) {
-      /* 三音铺底，轻微失谐做出厚度 */
-      [0, 3, 7].forEach(function (iv, i) {
-        mtone(fRoot * 2 * Math.pow(2, iv / 12) * (1 + (i - 1) * 0.002), beat * 4, 'triangle', 0.045, when);
+      var third = tr.drums >= 3 ? 4 : 3;      /* 深层首领用大三度，更刺 */
+      [0, third, 7].forEach(function (iv, i) {
+        mtone(fRoot * 2 * Math.pow(2, iv / 12) * (1 + (i - 1) * 0.002), beat * 4, 'triangle', 0.05, when);
       });
     }
+
+    /* 琶音：按 arpPat 走，每句最后一小节升八度做变化 */
     if (tr.arp) {
-      var every = tr.drums ? 1 : 2;         /* 门户曲放慢一倍 */
+      var every = tr.drums ? 1 : 2;
       if (s % every === 0) {
-        var n = ARP[(step >> (tr.drums ? 0 : 1)) % ARP.length];
-        mtone(fRoot * 4 * Math.pow(2, n / 12), 0.13, 'triangle', tr.drums ? 0.052 : 0.038, when);
+        var idx = (step >> (tr.drums ? 0 : 1)) % tr.arpPat.length;
+        var oct = phrasePos === 3 ? 2 : 1;
+        mtone(fRoot * 4 * oct * Math.pow(2, tr.arpPat[idx] / 12), 0.13, 'triangle',
+          (tr.drums ? 0.055 : 0.04) * (idx % 2 ? 0.8 : 1), when);
       }
     }
+
+    /* 主旋律：每小节一句，隔小节换气，句尾拖长音 */
+    if (tr.mel) {
+      var note = tr.melPat[s];
+      if (note != null) {
+        var long = (s === 0 || s === 8);
+        mtone(fRoot * 4 * Math.pow(2, note / 12), long ? 0.34 : 0.15, tr.melType, tr.melVol, when);
+      }
+    }
+
+    /* 鼓 */
     if (tr.drums) {
-      if (s === 0 || s === 8 || (tr.drums === 2 && s === 11)) kick(when, tr.drums === 2 ? 0.40 : 0.34);
-      if (s === 4 || s === 12) snare(when, tr.drums === 2 ? 0.14 : 0.11);
-      if (tr.drums === 2 && s % 2 === 1) hat(when, 0.040);
-      else if (s % 4 === 2) hat(when, 0.032);
+      var heavy = tr.drums >= 2;
+      if (s === 0 || s === 8 || (heavy && s === 11) || (tr.drums === 4 && s === 6)) kick(when, heavy ? 0.42 : 0.34);
+      if (s === 4 || s === 12) snare(when, heavy ? 0.15 : 0.11);
+      if (tr.drums >= 3) {
+        if (s % 2 === 1) hat(when, 0.042);
+        if (s === 14) hat(when, 0.05, true);
+      } else if (s % 4 === 2) hat(when, 0.032);
+
+      /* 过门：每 4 小节末尾加军鼓滚奏，第 4 小节开头加镲片 */
+      if (phrasePos === 3 && (s === 13 || s === 14 || s === 15)) snare(when, 0.09 + s * 0.004);
+      if (phrasePos === 0 && s === 0) crash(when, heavy ? 0.11 : 0.08);
+      if (tr.drums === 4 && phrasePos === 2 && s === 15) kick(when, 0.36);
     }
   }
 
@@ -325,6 +435,10 @@
   };
   A.currentMusic = function () { return curTrack; };
   A.startMusic = function (name) { A.music(typeof name === 'string' ? name : 'battle'); };
+  /* v11：按层数自动升级曲目，避免整局听同一段循环 */
+  A.battleMusic = function (floor) { A.music((floor || 1) >= 4 ? 'battle2' : 'battle'); };
+  A.bossMusic = function (floor) { A.music((floor || 1) >= 6 ? 'boss2' : 'boss'); };
+  A.trackCount = function () { return Object.keys(TRACKS).length; };
   A.stopMusic = function () {
     curTrack = null;
     stopScheduler();

@@ -12,6 +12,20 @@
   <canvas id="game"></canvas>
   <div id="fx-overlay"></div>
 
+  <!-- ============ 全局音量（任何界面都能调，V 键开关） ============ -->
+  <button id="vol-fab" class="vol-fab" type="button" title="音量调节（V）" aria-label="音量调节">🔊</button>
+  <div id="vol-panel" class="vol-panel hidden">
+    <div class="vol-head"><b>声音</b><button id="vol-close" type="button" aria-label="关闭">×</button></div>
+    <label class="vol-row"><span>总音量</span><input id="vol-master" type="range" min="0" max="100" step="1"><b id="vol-master-val">100%</b></label>
+    <label class="vol-row"><span>音乐</span><input id="vol-music" type="range" min="0" max="100" step="1"><b id="vol-music-val">100%</b></label>
+    <label class="vol-row"><span>音效</span><input id="vol-sfx" type="range" min="0" max="100" step="1"><b id="vol-sfx-val">100%</b></label>
+    <label class="vol-row"><span>响度</span><select id="vol-loud">
+      <option value="max">狂暴 ×2.6</option><option value="loud">增强 ×1.7</option><option value="normal">标准 ×1.0</option>
+    </select></label>
+    <button id="vol-mute" type="button" class="vol-mute-btn">静音 / 取消静音（M）</button>
+    <p class="vol-tip">拖动即时生效并自动保存 · V 键开关面板</p>
+  </div>
+
   <!-- ============ 战斗 HUD ============ -->
   <div id="hud" class="hidden">
     <div class="hud-top">
@@ -228,7 +242,7 @@
         <button id="btn-settings" class="btn">设置</button>
         <button id="btn-account" class="btn">账号中心 / 切换难度</button>
       </div>
-      <div class="menu-foot">WASD 移动 · SPACE 冲刺 · Q 释放 EMP · 1/2/3 选强化 · R 重掷 · P 暂停 · M 静音</div>
+      <div class="menu-foot">WASD 移动 · SPACE 冲刺 · Q 释放 EMP · 1/2/3 选强化 · R 重掷 · P 暂停 · M 静音 · V 音量</div>
     </div>
   </section>
 
@@ -253,7 +267,7 @@
         <div class="help-item"><b>炼狱契约</b><span>击破首领进入下一层时三选一：接受诅咒换强力收益（伤害、分数、暴击、宝箱…），本局永久叠加；也可跳过稳妥推进</span></div>
         <div class="help-item"><b>首领词缀</b><span>第 2 层起首领附带随机词缀：壁垒减伤 / 噬主回血 / 崩解弹幕 / 狂血加速 / 群噬召唤 / 蚀界灼烧，层数越深词缀越多</span></div>
         <div class="help-item"><b>P / ESC</b><span>暂停游戏并显示本局构筑快照；切到其他窗口 / 切后台会自动暂停，不会在你看不见的时候被围死</span></div>
-        <div class="help-item"><b>M</b><span>一键静音 / 取消静音，保留音量设置；适合上课或开会时突然需要安静</span></div>
+        <div class="help-item"><b>M / V</b><span>M 一键静音（保留音量设置）；V 打开右侧音量面板，可分别调总音量 / 音乐 / 音效，并切换「响度增强」三档</span></div>
         <div class="help-item"><b>触屏</b><span>左侧摇杆移动，右下角冲刺 / EMP 按钮；桌面端可全屏获得更大视野</span></div>
       </div>
       <div class="help-note">无尽炼狱没有通关：只有阵亡才结束，越深越强。每通过一层会回复生命、补充能量、投放稀有宝箱并签订契约；卡顿时自动降低特效负载。看看你能到第几层。</div>
@@ -268,6 +282,9 @@
       <label class="set-row"><span>音量</span><input id="set-volume" type="range" min="0" max="100" value="60"><b id="set-volume-val">60%</b></label>
       <label class="set-row"><span>音乐音量</span><input id="set-music-vol" type="range" min="0" max="100" value="90"><b id="set-music-vol-val">90%</b></label>
       <label class="set-row"><span>背景音乐</span><input id="set-music-on" type="checkbox" checked></label>
+      <label class="set-row"><span>音效音量</span><input id="set-sfx-vol" type="range" min="0" max="100" value="100"><b id="set-sfx-vol-val">100%</b></label>
+      <label class="set-row"><span>响度增强</span><select id="set-loud"><option value="max">狂暴 ×2.6（推荐）</option><option value="loud">增强 ×1.7</option><option value="normal">标准 ×1.0</option></select></label>
+      <label class="set-row"><span>特效强度</span><select id="set-fx"><option value="2">狂暴（推荐）</option><option value="1.5">强</option><option value="1">标准</option></select></label>
       <label class="set-row"><span>全局静音 <em>M</em></span><input id="set-muted" type="checkbox"></label>
       <label class="set-row"><span>画质</span><select id="set-quality"><option value="high">高 · 完整辉光 + Bloom</option><option value="medium">中 · 均衡</option><option value="low">低 · 省电（关闭泛光）</option></select></label>
       <label class="set-row"><span>辉光泛光</span><input id="set-bloom" type="checkbox" checked></label>

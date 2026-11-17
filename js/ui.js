@@ -42,6 +42,11 @@
     $('touch-controls').classList.toggle('hidden', !(isTouch && name === null));
     if (name !== null) hideControlHint();
     if (name === 'pause') renderPauseInfo();
+    /* 进入全屏面板时收起音量面板，避免遮挡设置项 */
+    if (name !== null && $('vol-panel') && !$('vol-panel').classList.contains('hidden')) {
+      $('vol-panel').classList.add('hidden');
+      syncVolumeUI();
+    }
   }
 
   /* v10：暂停面板显示本局战术快照，不用退出就能复盘构筑 */
@@ -122,8 +127,9 @@
     var on = NS.Audio.toggleMute();
     save.settings.muted = !!on;
     U.Save.save();
+    syncVolumeUI();
     showToast(on ? '🔇 已静音 · 按 M 恢复' : '🔊 声音已恢复', !!on, true);
-    if (!on) NS.Audio.play('select');
+    if (!on) NS.Audio.play('uiBig');
   }
 
   function refreshBest() {    /* 直接读当前档案的持久化数据，切换账号后菜单纪录不会显示上一个档案的缓存 */
@@ -183,9 +189,15 @@
   }
 
   function startGame() {
-    NS.Audio.init(save.settings.volume, save.settings.musicVol == null ? 0.9 : save.settings.musicVol);
+    NS.Audio.init(
+      save.settings.volume,
+      save.settings.musicVol == null ? 1 : save.settings.musicVol,
+      save.settings.sfxVol == null ? 1 : save.settings.sfxVol
+    );
+    NS.Audio.setLoudness(save.settings.loudness || 'max');
     NS.Audio.setMusicEnabled(save.settings.musicOn !== false);
     NS.Audio.setMute(save.settings.muted === true);
+    if (game.setFxPower) game.setFxPower(save.settings.fxPower == null ? 2 : save.settings.fxPower);
     NS.Audio.resume();
     $('event-banner').classList.add('hidden');
     $('combo-box').classList.add('hidden');
@@ -635,15 +647,23 @@
     game.setShake(s.shake);
     game.setQuality(s.quality);
     if (game.setBloom) game.setBloom(s.bloom !== false);
+    if (game.setFxPower) game.setFxPower(s.fxPower == null ? 2 : s.fxPower);
     if (NS.Perf && NS.Perf.setMode) NS.Perf.setMode(s.fps || 'auto');
     if (fill) {
       $('set-volume').value = Math.round(s.volume * 100);
       $('set-volume-val').textContent = Math.round(s.volume * 100) + '%';
       if ($('set-music-vol')) {
-        var mv = s.musicVol == null ? 0.9 : s.musicVol;
+        var mv = s.musicVol == null ? 1 : s.musicVol;
         $('set-music-vol').value = Math.round(mv * 100);
         $('set-music-vol-val').textContent = Math.round(mv * 100) + '%';
       }
+      if ($('set-sfx-vol')) {
+        var sv = s.sfxVol == null ? 1 : s.sfxVol;
+        $('set-sfx-vol').value = Math.round(sv * 100);
+        $('set-sfx-vol-val').textContent = Math.round(sv * 100) + '%';
+      }
+      if ($('set-loud')) $('set-loud').value = s.loudness || 'max';
+      if ($('set-fx')) $('set-fx').value = String(s.fxPower == null ? 2 : s.fxPower);
       if ($('set-music-on')) $('set-music-on').checked = s.musicOn !== false;
       if ($('set-muted')) $('set-muted').checked = s.muted === true;
       $('set-quality').value = s.quality;
@@ -651,16 +671,136 @@
       $('set-bloom').checked = s.bloom !== false;
       if ($('set-fps')) $('set-fps').value = s.fps || 'auto';
     }
-    NS.Audio.setMusicVolume(s.musicVol == null ? 0.9 : s.musicVol);
+    NS.Audio.setMusicVolume(s.musicVol == null ? 1 : s.musicVol);
+    NS.Audio.setSfxVolume(s.sfxVol == null ? 1 : s.sfxVol);
+    NS.Audio.setLoudness(s.loudness || 'max');
     NS.Audio.setMusicEnabled(s.musicOn !== false);
     NS.Audio.setMute(s.muted === true);
+    syncVolumeUI();
     U.Save.save();
   }
-  $('set-music-vol').addEventListener('input', function () {
-    save.settings.musicVol = Number(this.value) / 100;
-    if ($('set-music-vol-val')) $('set-music-vol-val').textContent = this.value + '%';
-    NS.Audio.setMusicVolume(save.settings.musicVol);
+
+  /* v11：任何一次点击/按键前确保音频上下文已按当前设置初始化（浏览器要求手势后才能出声） */
+  function ensureAudio() {
+    var st = save.settings;
+    NS.Audio.init(st.volume, st.musicVol == null ? 1 : st.musicVol, st.sfxVol == null ? 1 : st.sfxVol);
+    NS.Audio.setLoudness(st.loudness || 'max');
+    NS.Audio.setMusicEnabled(st.musicOn !== false);
+    NS.Audio.setMute(st.muted === true);
+    NS.Audio.resume();
+  }
+
+  /* v11：全局音量面板（HUD / 门户 / 结算都能用），与设置页双向同步 */
+  function syncVolumeUI() {
+    var s = save.settings;
+    var m = Math.round((s.volume == null ? 1 : s.volume) * 100);
+    var mu = Math.round((s.musicVol == null ? 1 : s.musicVol) * 100);
+    var sx = Math.round((s.sfxVol == null ? 1 : s.sfxVol) * 100);
+    if ($('vol-master')) { $('vol-master').value = m; $('vol-master-val').textContent = m + '%'; }
+    if ($('vol-music')) { $('vol-music').value = mu; $('vol-music-val').textContent = mu + '%'; }
+    if ($('vol-sfx')) { $('vol-sfx').value = sx; $('vol-sfx-val').textContent = sx + '%'; }
+    if ($('vol-loud')) $('vol-loud').value = s.loudness || 'max';
+    var fab = $('vol-fab');
+    if (fab) {
+      var muted = s.muted === true;
+      fab.textContent = muted ? '🔇' : (m === 0 ? '🔈' : '🔊');
+      fab.classList.toggle('muted', muted);
+    }
+    if ($('vol-mute')) $('vol-mute').textContent = s.muted ? '取消静音（M）' : '静音（M）';
+  }
+  function setVolField(key, val) {
+    save.settings[key] = val;
+    if (key === 'volume') game.setVolume(val);
+    if (key === 'musicVol') NS.Audio.setMusicVolume(val);
+    if (key === 'sfxVol') NS.Audio.setSfxVolume(val);
+    if (key === 'loudness') NS.Audio.setLoudness(val);
+    syncVolumeUI();
     U.Save.save();
+    if ($('set-volume') && key === 'volume') { $('set-volume').value = Math.round(val * 100); $('set-volume-val').textContent = Math.round(val * 100) + '%'; }
+    if ($('set-music-vol') && key === 'musicVol') { $('set-music-vol').value = Math.round(val * 100); $('set-music-vol-val').textContent = Math.round(val * 100) + '%'; }
+    if ($('set-sfx-vol') && key === 'sfxVol') { $('set-sfx-vol').value = Math.round(val * 100); $('set-sfx-vol-val').textContent = Math.round(val * 100) + '%'; }
+    if ($('set-loud') && key === 'loudness') $('set-loud').value = val;
+  }
+
+  ['master', 'music', 'sfx'].forEach(function (k) {
+    var el = $('vol-' + k);
+    if (!el) return;
+    var key = k === 'master' ? 'volume' : (k === 'music' ? 'musicVol' : 'sfxVol');
+    el.addEventListener('input', function () {
+      setVolField(key, Number(this.value) / 100);
+      NS.Audio.play('uiStep');
+    });
+    el.addEventListener('change', function () { NS.Audio.play('uiTap'); });
+  });
+  if ($('vol-loud')) $('vol-loud').addEventListener('change', function () {
+    setVolField('loudness', this.value);
+    NS.Audio.play('uiBig');
+  });
+  $('vol-master').addEventListener('dblclick', function () { setVolField('volume', 1); NS.Audio.play('uiBig'); });
+  function toggleVolPanel(force) {
+    var p = $('vol-panel');
+    if (!p) return;
+    ensureAudio();
+    var opening = force === undefined ? p.classList.contains('hidden') : !!force;
+    p.classList.toggle('hidden', !opening);
+    NS.Audio.play(opening ? 'uiOpen' : 'uiClose');
+    if (opening) syncVolumeUI();
+  }
+  if ($('vol-fab')) $('vol-fab').addEventListener('click', function (e) { e.stopPropagation(); toggleVolPanel(); });
+  if ($('vol-close')) $('vol-close').addEventListener('click', function () { toggleVolPanel(false); });
+  if ($('vol-mute')) $('vol-mute').addEventListener('click', function () { toggleMute(); syncVolumeUI(); });
+  doc.addEventListener('pointerdown', function (e) {
+    var p = $('vol-panel');
+    if (!p || p.classList.contains('hidden')) return;
+    if (p.contains(e.target) || (e.target.closest && e.target.closest('#vol-fab'))) return;
+    toggleVolPanel(false);
+  }, true);
+
+  /* v11：所有可点元素统一音效 + 按压/波纹反馈（已有专属音效的点击不重复叠加） */
+  function ripple(el, e) {
+    if (!el || el.tagName !== 'BUTTON') return;
+    var r = el.getBoundingClientRect();
+    var sp = doc.createElement('span');
+    sp.className = 'ui-ripple';
+    sp.style.left = (e.clientX - r.left) + 'px';
+    sp.style.top = (e.clientY - r.top) + 'px';
+    el.appendChild(sp);
+    setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 560);
+  }
+  var CLICKABLE = 'button, .upgrade-card, .pact-card, .p-diff, .p-tab, .p-lab-row, .p-codex-item';
+  doc.addEventListener('pointerdown', function (e) {
+    ensureAudio();
+    var t = e.target && e.target.closest ? e.target.closest(CLICKABLE) : null;
+    if (!t || t.disabled) return;
+    if (!NS.Audio.recent || !NS.Audio.recent(70)) NS.Audio.play('uiTap');
+    t.classList.remove('ui-press'); void t.offsetWidth; t.classList.add('ui-press');
+    t.classList.add('ui-flash');
+    setTimeout(function () { t.classList.remove('ui-press', 'ui-flash'); }, 230);
+    ripple(t, e);
+  }, true);
+  doc.addEventListener('pointerover', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest('button') : null;
+    if (!t || t.disabled) return;
+    NS.Audio.play('uiHover');
+  }, true);
+  $('set-music-vol').addEventListener('input', function () {
+    setVolField('musicVol', Number(this.value) / 100);
+    NS.Audio.play('uiStep');
+  });
+  if ($('set-sfx-vol')) $('set-sfx-vol').addEventListener('input', function () {
+    setVolField('sfxVol', Number(this.value) / 100);
+    NS.Audio.play('uiStep');
+  });
+  if ($('set-loud')) $('set-loud').addEventListener('change', function () {
+    setVolField('loudness', this.value);
+    NS.Audio.play('uiBig');
+  });
+  if ($('set-fx')) $('set-fx').addEventListener('change', function () {
+    save.settings.fxPower = Number(this.value);
+    if (game.setFxPower) game.setFxPower(save.settings.fxPower);
+    U.Save.save();
+    NS.Audio.play('uiBig');
+    showToast('特效强度已切换 · ' + (Number(this.value) >= 2 ? '狂暴' : Number(this.value) > 1 ? '强' : '标准'), false, true);
   });
   $('set-music-on').addEventListener('change', function () {
     save.settings.musicOn = this.checked;
@@ -675,8 +815,12 @@
 
   /* v10：恢复默认设置（只重置音频/画质/帧率，不动账号与纪录） */
   if ($('btn-reset-settings')) $('btn-reset-settings').addEventListener('click', function () {
-    save.settings.volume = 0.85;
-    save.settings.musicVol = 0.9;
+    save.settings.volume = 1;
+    save.settings.musicVol = 1;
+    save.settings.sfxVol = 1;
+    save.settings.loudness = 'max';
+    save.settings.fxPower = 2;
+    save.settings.loudVer = 11;
     save.settings.musicOn = true;
     save.settings.muted = false;
     save.settings.quality = 'high';
@@ -702,11 +846,8 @@
     root.location.reload();
   });
   $('set-volume').addEventListener('input', function () {
-    save.settings.volume = Number(this.value) / 100;
-    $('set-volume-val').textContent = this.value + '%';
-    game.setVolume(save.settings.volume);
-    U.Save.save();
-    NS.Audio.play('select');
+    setVolField('volume', Number(this.value) / 100);
+    NS.Audio.play('uiStep');
   });
   $('set-quality').addEventListener('change', function () {
     save.settings.quality = this.value;
@@ -776,9 +917,17 @@
   /* ---------------- 键盘 ---------------- */
   root.addEventListener('keydown', function (e) {
     if (e.repeat) return;
+    var c0 = e.code;
+    var tag = (e.target && e.target.tagName) || '';
+    var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    /* v11：M / V 在任何界面都生效（包括门户），输入框内不劫持 */
+    if (!typing && c0 === 'KeyM') { toggleMute(); return; }
+    if (!typing && c0 === 'KeyV') { toggleVolPanel(); return; }
+    if (!typing && c0 === 'Escape' && $('vol-panel') && !$('vol-panel').classList.contains('hidden')) {
+      toggleVolPanel(false); return;
+    }
     if (NS.Portal && NS.Portal.isOpen()) return;   // 登录门户打开时由门户接管
     var c = e.code;
-    if (c === 'KeyM') { toggleMute(); return; }     // v10：随时静音，任何界面都生效
     if (game.state === 'contract') {
       var ci = (c === 'Digit1' || c === 'Numpad1') ? 0 :
                (c === 'Digit2' || c === 'Numpad2') ? 1 :

@@ -25,7 +25,13 @@
     this._dx = 0; this._dy = 0;   // 方向性震动
     this.zoom = 0;                // 镜头推近
     this.arcs = [];               // 电弧折线
+    this.power = 2;               // v11 特效强度：1 标准 / 1.5 强 / 2 狂暴（默认）
   }
+
+  FX.prototype.setPower = function (p) { this.power = Math.max(1, Math.min(2.4, p || 1)); };
+  FX.prototype._n = function (n, cap) {
+    return Math.min(cap || 90, Math.round(n * (0.55 + this.power * 0.45)));
+  };
 
   FX.prototype.setQuality = function (q) {
     this.quality = q;
@@ -44,38 +50,48 @@
 
   /* type 0 = 火花线段, 1 = 柔光圆, 2 = 碎片方块 */
   FX.prototype.spark = function (x, y, color, n, speed, life, size) {
-    n = Math.min(n || 8, this.quality === 'low' ? 5 : n || 8);
+    n = Math.min(this._n(n || 8), this.quality === 'low' ? 6 : 72);
+    size = size * (0.85 + this.power * 0.25);
     for (var i = 0; i < n; i++) {
       var a = U.rand(0, U.TAU), v = U.rand(speed * 0.35, speed);
       this._spawn(x, y, Math.cos(a) * v, Math.sin(a) * v,
-        U.rand(life * 0.5, life), U.rand(size * 0.5, size), color, 0, 0.90, 0);
+        U.rand(life * 0.6, life * 1.15), U.rand(size * 0.5, size), color, 0, 0.90, 0);
     }
   };
   FX.prototype.burst = function (x, y, color, n, power) {
     n = n || 14; power = power || 220;
-    this.spark(x, y, color, n, power, 0.55, 3.5);
-    var soft = this.quality === 'low' ? 2 : 6;
+    this.spark(x, y, color, n, power, 0.62, 3.8);
+    var soft = this.quality === 'low' ? 2 : this._n(6, 26);
     for (var i = 0; i < soft; i++) {
-      var a = U.rand(0, U.TAU), v = U.rand(20, power * 0.35);
-      this._spawn(x, y, Math.cos(a) * v, Math.sin(a) * v, U.rand(0.28, 0.6), U.rand(9, 22), color, 1, 0.88, 0);
+      var a = U.rand(0, U.TAU), v = U.rand(20, power * 0.42);
+      this._spawn(x, y, Math.cos(a) * v, Math.sin(a) * v, U.rand(0.3, 0.7),
+        U.rand(10, 26) * (0.8 + this.power * 0.2), color, 1, 0.88, 0);
     }
+    /* 中心闪爆：一圈快环，让每次命中都有明确的“打到了” */
+    if (this.power >= 1.5) this.ring(x, y, 2, power * 0.11, color, 2.4, 0.22);
   };
   FX.prototype.trail = function (x, y, color, size) {
     this._spawn(x, y, U.rand(-16, 16), U.rand(-16, 16), U.rand(0.16, 0.32), size || 4, color, 1, 0.9, 0);
   };
   FX.prototype.debris = function (x, y, color, n) {
-    for (var i = 0; i < (n || 6); i++) {
-      var a = U.rand(0, U.TAU), v = U.rand(60, 260);
+    n = this._n(n || 6, 40);
+    for (var i = 0; i < n; i++) {
+      var a = U.rand(0, U.TAU), v = U.rand(60, 260 * (0.8 + this.power * 0.2));
       this._spawn(x, y, Math.cos(a) * v, Math.sin(a) * v, U.rand(0.3, 0.7), U.rand(2, 5), color, 2, 0.94, 180);
     }
   };
   FX.prototype.ring = function (x, y, r0, r1, color, width, life) {
-    if (this.rings.length > 60) this.rings.shift();
-    this.rings.push({ x: x, y: y, r0: r0, r1: r1, r: r0, t: 0, life: life || 0.35, color: color, w: width || 3 });
+    if (this.rings.length > 70) this.rings.shift();
+    this.rings.push({
+      x: x, y: y, r0: r0, r1: r1, r: r0, t: 0,
+      life: (life || 0.35) * (0.9 + this.power * 0.1),
+      color: color, w: (width || 3) * (0.85 + this.power * 0.3)
+    });
   };
   FX.prototype.text = function (x, y, str, color, size, crit) {
     if (this.texts.length > 45) this.texts.shift();
-    this.texts.push({ x: x + U.rand(-6, 6), y: y - 8, str: str, color: color, size: size || 13, t: 0, life: crit ? 0.85 : 0.62, vy: crit ? -58 : -42, crit: !!crit });
+    var s = (size || 13) * (0.9 + this.power * 0.16);
+    this.texts.push({ x: x + U.rand(-6, 6), y: y - 8, str: str, color: color, size: s, t: 0, life: crit ? 0.95 : 0.72, vy: crit ? -58 : -42, crit: !!crit });
   };
   FX.prototype.beam = function (x1, y1, x2, y2, color, width, life) {
     if (this.beams.length > 30) this.beams.shift();
@@ -89,7 +105,7 @@
   /* 方向性震动：传入冲击方向时，画面沿受力方向偏移而非纯随机抖动 */
   FX.prototype.addShake = function (v, dx, dy) {
     if (!this.shakeEnabled) return;
-    this.shake = Math.min(26, this.shake + v);
+    this.shake = Math.min(34, this.shake + v * this.power);
     if (dx !== undefined && dy !== undefined) {
       var l = U.hypot(dx, dy) || 1;
       this._dx = dx / l; this._dy = dy / l;
@@ -107,12 +123,16 @@
     this.arcs.push({ pts: pts, color: color, t: 0, life: life || 0.17, w: width || 2.5 });
   };
   FX.prototype.smoke = function (x, y, color, n) {
-    for (var i = 0; i < (n || 4); i++) {
+    n = this._n(n || 4, 30);
+    for (var i = 0; i < n; i++) {
       this._spawn(x + U.rand(-8, 8), y + U.rand(-8, 8), U.rand(-24, 24), U.rand(-55, -12),
         U.rand(0.4, 0.85), U.rand(10, 24), color, 1, 0.9, -10);
     }
   };
-  FX.prototype.addFlash = function (v, rgb) { this.flash = Math.min(1, this.flash + v); if (rgb) this.flashColor = rgb; };
+  FX.prototype.addFlash = function (v, rgb) {
+    this.flash = Math.min(1, this.flash + v * (0.65 + this.power * 0.4));
+    if (rgb) this.flashColor = rgb;
+  };
 
   /* ---- v10 新增打击 / 技能特效原语 ---- */
   /* 冲击波：一圈快环 + 一圈慢环 + 放射状火花，用于首领登场、EMP、升级 */
@@ -311,7 +331,7 @@
   FX.prototype.drawScreen = function (ctx, w, h) {
     if (this.flash > 0.01) {
       ctx.save();
-      ctx.fillStyle = 'rgba(' + this.flashColor + ',' + (this.flash * 0.5) + ')';
+      ctx.fillStyle = 'rgba(' + this.flashColor + ',' + (this.flash * 0.62) + ')';
       ctx.fillRect(0, 0, w, h);
       ctx.restore();
     }

@@ -33,7 +33,11 @@
   function blank() {
     return {
       bestScore: 0, bestTime: 0, bestFloor: 0, totalKills: 0, totalRuns: 0, wins: 0,
-      settings: { volume: 0.85, shake: true, quality: 'high', bloom: true, fps: 'auto', musicVol: 0.9, musicOn: true, muted: false }
+      settings: {
+        volume: 1, shake: true, quality: 'high', bloom: true, fps: 'auto',
+        musicVol: 1, musicOn: true, muted: false,
+        sfxVol: 1, loudness: 'max', fxPower: 2, loudVer: 11
+      }
     };
   }
   function merge(dst, src) {
@@ -89,6 +93,12 @@
         if (!u.difficulty) u.difficulty = 'elite';
         if (typeof u.cores !== 'number' || !isFinite(u.cores) || u.cores < 0) u.cores = 0;
         if (!u.lab || typeof u.lab !== 'object' || Array.isArray(u.lab)) u.lab = {};
+        /* v11 一次性响度迁移：老档案默认音量偏小，抬到满档 + 最强响度（用户可再自行下调） */
+        var sg = u.stats.settings;
+        if (sg && sg.loudVer !== 11) {
+          sg.volume = 1; sg.musicVol = 1; sg.sfxVol = 1;
+          sg.loudness = 'max'; sg.fxPower = 2; sg.loudVer = 11;
+        }
       }
       this.db = db;
       return db;

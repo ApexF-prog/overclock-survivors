@@ -119,7 +119,12 @@
   var KEY = 'neon_survivors_v1';
   var DEFAULTS = {
     bestScore: 0, bestTime: 0, bestFloor: 0, totalKills: 0, totalRuns: 0, wins: 0,
-    settings: { volume: 0.85, shake: true, quality: 'high', bloom: true, fps: 'auto', musicVol: 0.9, musicOn: true, muted: false }
+    /* v11：音量默认拉满 + 响度增强最强档；loudVer 用于老存档一次性迁移 */
+    settings: {
+      volume: 1, shake: true, quality: 'high', bloom: true, fps: 'auto',
+      musicVol: 1, musicOn: true, muted: false,
+      sfxVol: 1, loudness: 'max', fxPower: 2, loudVer: 11
+    }
   };
   U.Save = {
     data: null,
@@ -133,6 +138,15 @@
           if (p.settings) for (var s in DEFAULTS.settings) if (p.settings[s] !== undefined) d.settings[s] = p.settings[s];
         }
       } catch (e) { /* 使用默认值 */ }
+      /* v11 一次性响度迁移：老存档音量按旧标准（0.85/0.9）听感偏小，统一抬到满档 + 最强响度 */
+      if (d.settings.loudVer !== 11) {
+        d.settings.volume = 1;
+        d.settings.musicVol = 1;
+        d.settings.sfxVol = 1;
+        d.settings.loudness = 'max';
+        d.settings.fxPower = 2;
+        d.settings.loudVer = 11;
+      }
       this.data = d;
       return d;
     },

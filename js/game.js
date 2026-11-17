@@ -72,6 +72,7 @@
   };
   Game.prototype.setVolume = function (v) { this.volume = v; NS.Audio.setVolume(v); };
   Game.prototype.setShake = function (on) { this.fx.shakeEnabled = !!on; };
+  Game.prototype.setFxPower = function (v) { this.fx.setPower(v); };
 
   Game.prototype.reset = function () {
     var p = this.player = new NS.Player(0, 0);
@@ -95,7 +96,7 @@
     NS.Audio.resume();
     NS.Audio.setPaused(false);
     NS.Audio.duckMusic(false);
-    NS.Audio.startMusic('battle');
+    NS.Audio.battleMusic(this.floor || 1);
     NS.Audio.play('start');
     this.onEvent('start', {});
   };
@@ -395,7 +396,7 @@
     if (this.fx.shock) this.fx.shock(e.x, e.y, 260, '#ff2f8e');
     else this.fx.ring(e.x, e.y, 10, 240, '#ff2f8e', 5, 0.6);
     NS.Audio.play('boss');
-    NS.Audio.music('boss');
+    NS.Audio.bossMusic(this.floor || 1);
     this.onEvent('toast', { text: 'WARNING // 首领来袭 · ' + e.name, danger: true, long: true });
   };
   Game.prototype.spawnMinions = function (boss, n) {
@@ -613,14 +614,14 @@
     /* v5：累计真实造成的伤害，用于估算 DPS（首领自适应血量） */
     var _dealt = _before - Math.max(e.hp, 0);
     if (_dealt > 0) this.dmgAcc += _dealt;
-    e.hitFlash = 0.09;
+    e.hitFlash = 0.13;
     var kl = U.hypot(kx, ky) || 1;
     e.kx += kx / kl * (knock || 80);
     e.ky += ky / kl * (knock || 80);
     /* v3：敌群密集时按概率跳过伤害数字/火花/命中音，这是掉帧的主要来源 */
     var dense = this.enemies.length > 55, perf = this.perfLevel || 0;
     var showText = !dense || crit || d > 45 || Math.random() < (perf > 0 ? 0.08 : 0.22);
-    if (showText) this.fx.text(e.x, e.y - e.radius, String(Math.round(d)), crit ? '#ffe14d' : '#eaf6ff', crit ? 14 : 12, crit);
+    if (showText) this.fx.text(e.x, e.y - e.radius, String(Math.round(d)), crit ? '#ffe14d' : '#eaf6ff', crit ? 17 : 13, crit);
     /* 暴击：额外金色迸溅 + 小冲击环 + 顿帧感，打击反馈更明确 */
     if (crit && (!dense || Math.random() < 0.5)) {
       this.fx.spark(e.x, e.y, '#ffe14d', 8, 300, 0.34, 3.2);
@@ -651,7 +652,7 @@
       if (this.fx.shock) this.fx.shock(e.x, e.y, 300, '#ffb03a');
       this.fx.ring(e.x, e.y, 20, 380, '#ffe14d', 4, 0.75);
       this.fx.addShake(9);
-      NS.Audio.music('battle');
+      NS.Audio.battleMusic(this.floor || 1);
       NS.Audio.play('explode');
       this.onEvent('toast', {
         text: this.bossStartAt
