@@ -1,4 +1,4 @@
-# 超频幸存者 · OVERCLOCK SURVIVORS v11.1 · 无尽炼狱
+# 超频幸存者 · OVERCLOCK SURVIVORS v11.2 · 无尽炼狱
 
 [![在线试玩](https://img.shields.io/badge/%E2%96%B6%20%E5%9C%A8%E7%BA%BF%E8%AF%95%E7%8E%A9-PLAY-22e6ff?style=for-the-badge)](https://apexf-prog.github.io/overclock-survivors/)
 [![Repo](https://img.shields.io/badge/GitHub-overclock--survivors-181717?style=for-the-badge&logo=github)](https://github.com/ApexF-prog/overclock-survivors)
@@ -31,14 +31,39 @@ v10 是**体验补强版**：把「切后台会被围死」「返回主菜单后
 |---|---|
 | ![暂停](shots/v10-pause.png) | ![设置](shots/v10-settings.png) |
 
-## v11.1 修复（本次）
+## v11.2 首领形态程序化生成（本次）
+
+> 「BOSS 有多少关就要有多少个形态」——层数无限，形态就不能写死。
+
+新增 `js/bossdna.js`：用层号做 32 位哈希 → 线性同余发生器，产出一份确定性的「怪兽基因」。
+
+| 基因位 | 取值 | 表现 |
+|---|---|---|
+| `fam` 骨架族 | 0/1/2/3 轮换 | 巨口兽 / 多眼体 / 蛛形 / 蛇形 |
+| `hue` 主色相 | 每层 +47° 旋转 | 赤→黄→绿→青→蓝→紫→洋红，相邻层绝不撞色 |
+| `eyes` 眼数 | 1~8 | 巨口兽按档成对增眼，多眼体环状排布 |
+| `teeth` 獠牙 | 3~9 | 沿颌线等距分布 |
+| `legs` 节肢 | 6~14（偶数） | 蛛形按角度铺开 |
+| `segs` 体节 | 4~8 | 蛇形躯干节数 |
+| `tendrils` 触须 | 4~10 | 多眼体摆动触须 |
+| `horns` 角冠 | 0~3 | 头顶骨角，越长越深 |
+| `spots` 斑纹 | 0~3 组 | 躯干暗斑 |
+| `spikes` 棘刺 | 4~12 | 外环尖刺，长度随世代增长 |
+| `scale` 体型 | 0.92~1.26 | 同族也有大小差异 |
+| `jaw` / `tilt` / `wob` | 随机 | 张口幅度、身体倾斜、抖动频率 |
+
+- 同一层永远同一只（纯函数、可复现、可测试），不同层指纹必不同
+- 首领名字同步程序化：10 个前缀 × 8 个后缀，**80 层内不重名**，另附 `· L{层}`
+- 冒烟新增 2 项断言：12 层基因指纹去重 `12/12`、同层重复取用完全一致；名字去重 `12/12`
+
+## v11.1 修复
 
 | 问题 | 根因 | 修法 |
 |---|---|---|
 | 每层首领长得一模一样 | `systems.js` 的 `G.spawnBoss` 覆盖了 `game.js` 同名函数，但覆盖版漏写 `e.arch` / `e.gen`，`visuals.js` 里 `e.arch \|\| 0` 恒落到第 0 种 | 在实际生效的 `systems.js` 里按层赋值：`arch = (层-1) % 4`（巨口兽/多眼体/蛛形/蛇形），`gen = ⌊(层-1)/4⌋`，第 5 层起换世代配色 + 额外棘刺 |
 | 右侧音量喇叭压住连击数字 | `.combo-box` 在 `right:24px; top:44%`，`.vol-fab` 在 `right:14px; top:50%`，两者重叠 | 喇叭缩小到 42px 并半透明，连击左移到 `right:82px`（窄屏 64px），面板同步改到 `right:62px` |
 
-回归：冒烟测试新增「首领形态逐层轮换」断言（`arch 0→1→2→3→0→1` / `gen 0→0→0→0→1→1`），共 64 项全绿；浏览器侧在 1920×1080 ~ 640×560 共 9 种分辨率下逐一实测喇叭矩形与连击、HUD 元素零重叠。
+回归：冒烟测试新增「首领形态逐层轮换」断言（`arch 0→1→2→3→0→1` / `gen 0→0→0→0→1→1`），共 66 项全绿；浏览器侧在 1920×1080 ~ 640×560 共 9 种分辨率下逐一实测喇叭矩形与连击、HUD 元素零重叠。
 
 ## v11 声音 / 特效整改
 
@@ -299,7 +324,7 @@ node tests/smoke.js
 
 浏览器端另有 `tests/cdp_v7.js`（原生 WebSocket + Edge `--headless --remote-debugging-port=9226`），验证门户渲染、注册、研究所展开/购买、结算产核心与截图，无需任何 npm 包。
 
-当前结果：**64 项全部通过**（另有 v7~v11 五个浏览器验证脚本），连跑两次输出逐字一致。真实浏览器（Edge headless + CDP，正常 rAF）复验零 JS 异常：菜单、层数 HUD、L1 警报、常驻血条、击破进 L2、L3 首领 5647 HP、L5 高压自动降到第 2 档、无尽结算、暂停快照、狂暴血条换色、M 静音往返、布局越界、`autotest=1`、480×700 窄屏。
+当前结果：**66 项全部通过**（另有 v7~v11 五个浏览器验证脚本），连跑两次输出逐字一致。真实浏览器（Edge headless + CDP，正常 rAF）复验零 JS 异常：菜单、层数 HUD、L1 警报、常驻血条、击破进 L2、L3 首领 5647 HP、L5 高压自动降到第 2 档、无尽结算、暂停快照、狂暴血条换色、M 静音往返、布局越界、`autotest=1`、480×700 窄屏。
 
 浏览器里也可访问 `index.html?autotest=1` 自动开局，隐藏元素 `#autotest-out` 输出实时快照（含 `floor / floorState / bossKills / hex / perf`）。该模式用 `manualTick` 自驱动，规避 headless 虚拟时间下 `requestAnimationFrame` 不推进的问题。
 

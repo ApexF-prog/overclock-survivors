@@ -12,7 +12,7 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..');
 const FILES = [
   'core.js', 'account.js', 'lab.js', 'audio.js', 'fx.js', 'entities.js', 'content.js',
-  'game.js', 'visuals.js', 'systems.js', 'augments.js', 'synergy.js', 'meta.js',
+  'bossdna.js', 'game.js', 'visuals.js', 'systems.js', 'augments.js', 'synergy.js', 'meta.js',
   'perf.js', 'daily.js'
 ];
 
@@ -271,6 +271,19 @@ const bossGrows = bossHpByFloor.every((v, i) => i === 0 || v > bossHpByFloor[i -
 const bossArchOk = bossArchByFloor.every((v, i) => v === i % 4) &&
   new Set(bossArchByFloor).size === 4;
 const bossGenOk = bossGenByFloor[0] === 0 && bossGenByFloor[3] === 0 && bossGenByFloor[4] === 1;
+
+/* v12：无限层 → 无限形态。12 层内基因指纹必须两两不同，且同一层重复取用完全一致（可复现） */
+const dnaPrints = [], bossNameSet = new Set();
+for (let lv = 1; lv <= 12; lv++) {
+  const d = NS.bossDNA(lv);
+  dnaPrints.push([d.fam, d.hue, d.hue2, d.eyes, d.teeth, d.legs, d.segs,
+    d.tendrils, d.horns, d.spots, d.spikes, d.scale.toFixed(3)].join('|'));
+  bossNameSet.add(NS.bossName(lv));
+}
+const dnaUniqueOk = new Set(dnaPrints).size === dnaPrints.length;
+const dnaStableOk = JSON.stringify(NS.bossDNA(9)) === JSON.stringify(NS.bossDNA(9)) &&
+  JSON.stringify(NS.bossDNA(23)) === JSON.stringify(NS.bossDNA(23));
+const bossNameOk = bossNameSet.size === 12;
 const mobGrows = waveProduced && mobHpByFloor[5] > mobHpByFloor[0] &&
   mobDmgByFloor[5] > mobDmgByFloor[0] &&
   mobHpByFloor.every((v, i) => i === 0 || v >= mobHpByFloor[i - 1]);
@@ -483,6 +496,9 @@ const checks = [
     'L1 ' + bossHpByFloor[0] + ' → L6 ' + bossHpByFloor[5] + ' HP'],
   ['首领形态逐层轮换', bossArchOk && bossGenOk,
     'arch ' + bossArchByFloor.join('→') + ' / gen ' + bossGenByFloor.join('→')],
+  ['首领每层形态唯一', dnaUniqueOk && dnaStableOk,
+    '12 层基因指纹去重 ' + new Set(dnaPrints).size + '/12 · 同层可复现'],
+  ['首领名字逐层不重复', bossNameOk, bossNameSet.size + '/12 个不同名字'],
   ['小怪逐层变强', mobGrows,
     'HP ' + mobHpByFloor[0] + '→' + mobHpByFloor[5] + ' / 伤害 ' + mobDmgByFloor[0] + '→' + mobDmgByFloor[5]],
   ['首领不被瞬秒', bossCapOk, '单次受伤 ≤ 最大生命 3.5%'],

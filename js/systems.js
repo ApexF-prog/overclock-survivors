@@ -616,17 +616,15 @@
       hpMul, spdMul, dmgMul);
     e.fs = f; e.floor = f;
     e.radius = 52 * Math.min(1.5, 1 + (f - 1) * 0.035);
-    e.name = D.bossNames[(f - 1) % D.bossNames.length] + ' · L' + f;
-    /* v12 修复：本函数覆盖了 game.js 的 spawnBoss，但当时没把形态写进实体，
-       导致 visuals 里 `e.arch || 0` 永远落到第 0 种——每层首领长得一模一样。
-       现在按层轮换四种怪兽：0 巨口兽 / 1 多眼体 / 2 蛛形 / 3 蛇形；
-       每 4 层进入下一世代（换配色 + 额外棘刺），保证深层不重样。 */
-    e.arch = (f - 1) % 4;
-    e.gen = Math.floor((f - 1) / 4);
-    if (e.gen > 0) {
-      var PAL = ['#ff2f8e', '#38d6ff', '#ffb03a', '#a06bff'];
-      e.color = PAL[e.gen % PAL.length];
-    }
+    e.name = (NS.bossName ? NS.bossName(f) : D.bossNames[(f - 1) % D.bossNames.length]) + ' · L' + f;
+    /* v12：本函数覆盖了 game.js 的 spawnBoss。原先只按 4 取模轮换 4 种造型，深层必然重复；
+       现在改为「按层号确定性生成基因」：骨架族 4 选 1，再叠体型/配色/眼数/牙数/腿数/节数/
+       触手/角冠/斑纹/棘刺等十来个参数，同一层恒定、不同层unique，无限层都有新样子。 */
+    var dna = NS.bossDNA ? NS.bossDNA(f) : null;
+    e.dna = dna;
+    e.arch = dna ? dna.fam : (f - 1) % 4;
+    e.gen = dna ? dna.gen : Math.floor((f - 1) / 4);
+    if (dna) e.color = dna.color;
     /* v5：奖励随血量同步指数成长，避免「打半天只掉几颗宝石」 */
     var hpk = Math.pow(Math.max(1, hpMul) / 2.2, 0.36);
     e.xp = Math.round(70 * hpk);

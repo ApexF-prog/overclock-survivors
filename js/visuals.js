@@ -336,156 +336,209 @@
             ctx.beginPath(); ctx.arc(Math.cos(sa) * r * 0.48, Math.sin(sa) * r * 0.48, r * 0.17, 0, TAU); ctx.fill();
           }
           break;
-        case 6: /* 首领：按层数轮换四种怪兽形态 */
-          var arch = e.arch || 0, ph = e.phase;
+        case 6: /* 首领：按层号程序化生成，每层形态唯一（不依赖 4 种硬编码轮换） */
+          var d = e.dna;
+          if (!d) {           /* 兜底：无基因时退回第 0 族默认值，避免老存档或测试崩溃 */
+            d = { fam: e.arch || 0, hue: 330, hue2: 190, scale: 1, eyes: 2, teeth: 5, legs: 8,
+              segs: 5, tendrils: 6, horns: 0, spots: 0, rings: 2, spikes: 8, jaw: 1.0,
+              tilt: 0, wob: 1, gen: e.gen || 0 };
+            d.dark = '#1a0008'; d.bone = '#fff6dc'; d.color2 = '#ff7ae0';
+          }
+          var R = r * (d.scale || 1);
+          var ph = e.phase;
+          var iris = ph ? '#ffe14d' : d.color2;
+          var dark = d.dark, bone = d.bone;
+          /* 符文环：层数不同，环数与半径都不同 */
           ctx.save(); ctx.rotate(e.t * 0.45);
-          ctx.globalAlpha = 0.30; ctx.lineWidth = 3;
-          poly(ctx, 8, r * 1.45, -e.t * 0.8); ctx.stroke();
-          ctx.globalAlpha = 0.65; ctx.lineWidth = 1.5;
-          poly(ctx, 12, r * 1.24, e.t * 0.6); ctx.stroke();
+          for (var rg = 0; rg < d.rings; rg++) {
+            ctx.globalAlpha = 0.34 - rg * 0.07; ctx.lineWidth = 3 - rg;
+            poly(ctx, 8 + rg * 4, R * (1.42 + rg * 0.20), -e.t * 0.8 + rg * 0.5); ctx.stroke();
+          }
+          ctx.globalAlpha = 0.55; ctx.lineWidth = 1.4;
+          poly(ctx, 12, R * 1.22, e.t * 0.6); ctx.stroke();
           ctx.restore();
-          ctx.save(); ctx.rotate(pa);
-          var iris = ph ? '#ffe14d' : (arch === 1 ? '#ff7ae0' : (arch === 3 ? '#7dffb0' : '#ff5c7a'));
-          if (arch === 0) {
-            /* 巨口兽：楔形头 + 会张合的大嘴 + 两排獠牙 */
+
+          ctx.save(); ctx.rotate(pa + (d.tilt || 0));
+
+          if (d.fam === 0) {
+            /* 巨口兽：楔形头 + 张合大嘴 + 随层变化的獠牙数量 */
             ctx.beginPath();
-            ctx.moveTo(r * 1.42, 0);
-            ctx.lineTo(r * 0.30, -r * 1.18);
-            ctx.lineTo(-r * 1.06, -r * 0.80);
-            ctx.quadraticCurveTo(-r * 1.40, 0, -r * 1.06, r * 0.80);
-            ctx.lineTo(r * 0.30, r * 1.18);
+            ctx.moveTo(R * 1.42, 0);
+            ctx.lineTo(R * 0.30, -R * 1.18);
+            ctx.lineTo(-R * 1.06, -R * 0.80);
+            ctx.quadraticCurveTo(-R * 1.40, 0, -R * 1.06, R * 0.80);
+            ctx.lineTo(R * 0.30, R * 1.18);
             ctx.closePath(); ctx.fill();
-            var jaw = 0.16 + Math.abs(Math.sin(e.t * 1.8)) * 0.34;
-            ctx.fillStyle = '#1a0008';
+            var jaw = 0.14 + Math.abs(Math.sin(e.t * 1.8)) * 0.42 * (d.jaw || 1);
+            ctx.fillStyle = dark;
             ctx.beginPath();
-            ctx.moveTo(r * 1.20, 0);
-            ctx.lineTo(r * 0.10, -Math.sin(jaw) * r * 0.95);
-            ctx.lineTo(r * 0.10, Math.sin(jaw) * r * 0.95);
+            ctx.moveTo(R * 1.20, 0);
+            ctx.lineTo(R * 0.10, -Math.sin(jaw) * R * 0.95);
+            ctx.lineTo(R * 0.10, Math.sin(jaw) * R * 0.95);
             ctx.closePath(); ctx.fill();
-            ctx.fillStyle = '#fff6dc';
-            for (var th = 0; th < 5; th++) {
-              var tt = 0.22 + th * 0.16;
-              var tx = r * (1.20 - tt * r * 0.78);
-              var ty = Math.sin(jaw) * r * 0.92 * (1 - tt * 0.85);
-              ctx.beginPath(); ctx.moveTo(tx, -ty); ctx.lineTo(tx - r * 0.10, -ty * 0.45); ctx.lineTo(tx - r * 0.02, -ty * 0.92); ctx.closePath(); ctx.fill();
-              ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - r * 0.10, ty * 0.45); ctx.lineTo(tx - r * 0.02, ty * 0.92); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = bone;
+            var nth = d.teeth;
+            for (var th = 0; th < nth; th++) {
+              var tt = nth === 1 ? 0.5 : th / (nth - 1);
+              var tx = R * (1.18 - tt * R * 0.72);
+              var ty = Math.sin(jaw) * R * 0.92 * (1 - tt * 0.82);
+              var tw = R * (0.09 + (1 - tt) * 0.05);
+              ctx.beginPath(); ctx.moveTo(tx, -ty); ctx.lineTo(tx - tw, -ty * 0.45); ctx.lineTo(tx - tw * 0.2, -ty * 0.92); ctx.closePath(); ctx.fill();
+              ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - tw, ty * 0.45); ctx.lineTo(tx - tw * 0.2, ty * 0.92); ctx.closePath(); ctx.fill();
             }
-            ctx.fillStyle = iris;
-            ctx.beginPath(); ctx.arc(-r * 0.35, -r * 0.52, r * 0.16, 0, TAU); ctx.fill();
-            ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.52, r * 0.16, 0, TAU); ctx.fill();
-            ctx.fillStyle = '#12000a';
-            ctx.beginPath(); ctx.arc(-r * 0.35, -r * 0.52, r * 0.07, 0, TAU); ctx.fill();
-            ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.52, r * 0.07, 0, TAU); ctx.fill();
-          } else if (arch === 1) {
-            /* 多眼体：球体 + 眼球群 + 摆动的触须 */
-            ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
-            ctx.fillStyle = '#160018';
-            ctx.beginPath(); ctx.arc(0, 0, r * 0.72, 0, TAU); ctx.fill();
-            ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, r * 0.10);
+            /* 眼睛：固定两只，层数高时额外成对增眼 */
+            var eyep = [[-0.35, -0.52], [-0.35, 0.52]];
+            if (d.eyes > 4) eyep.push([-0.70, -0.34], [-0.70, 0.34]);
+            if (d.eyes > 6) eyep.push([-0.10, -0.78], [-0.10, 0.78]);
+            for (var ei = 0; ei < eyep.length; ei++) {
+              ctx.fillStyle = iris;
+              ctx.beginPath(); ctx.arc(R * eyep[ei][0], R * eyep[ei][1], R * 0.16, 0, TAU); ctx.fill();
+              ctx.fillStyle = dark;
+              ctx.beginPath(); ctx.arc(R * eyep[ei][0], R * eyep[ei][1], R * 0.07, 0, TAU); ctx.fill();
+            }
+          } else if (d.fam === 1) {
+            /* 多眼体：球体 + 随层变化的眼球数 + 触须数 */
+            ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+            ctx.fillStyle = dark;
+            ctx.beginPath(); ctx.arc(0, 0, R * (0.62 + d.spots * 0.03), 0, TAU); ctx.fill();
+            ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, R * 0.10);
             ctx.globalAlpha = 0.75;
-            for (var tb2 = 0; tb2 < 6; tb2++) {
-              var ta2 = tb2 * TAU / 6 + Math.sin(e.t * 2.4 + tb2) * 0.22;
+            for (var tb2 = 0; tb2 < d.tendrils; tb2++) {
+              var ta2 = tb2 * TAU / d.tendrils + Math.sin(e.t * 2.4 + tb2) * 0.22;
               ctx.beginPath();
-              ctx.moveTo(Math.cos(ta2) * r * 0.85, Math.sin(ta2) * r * 0.85);
-              ctx.quadraticCurveTo(Math.cos(ta2) * r * 1.35, Math.sin(ta2) * r * 1.35,
-                                   Math.cos(ta2 + 0.25) * r * 1.75, Math.sin(ta2 + 0.25) * r * 1.75);
+              ctx.moveTo(Math.cos(ta2) * R * 0.85, Math.sin(ta2) * R * 0.85);
+              ctx.quadraticCurveTo(Math.cos(ta2) * R * 1.35, Math.sin(ta2) * R * 1.35,
+                                   Math.cos(ta2 + 0.25) * R * 1.75, Math.sin(ta2 + 0.25) * R * 1.75);
               ctx.stroke();
             }
             ctx.globalAlpha = 1;
-            for (var ey = 0; ey < 7; ey++) {
-              var ea = ey * TAU / 7 + e.t * 0.6;
-              var er = ey === 0 ? r * 0.34 : r * 0.72;
-              var es = ey === 0 ? r * 0.30 : r * 0.17;
-              ctx.fillStyle = '#fff8e8';
+            var ne = d.eyes;
+            for (var ey = 0; ey < ne; ey++) {
+              var ea = ey * TAU / ne + e.t * 0.6;
+              var er = ne === 1 ? 0 : (ey === 0 ? R * 0.34 : R * 0.72);
+              var es = ne === 1 ? R * 0.46 : (ey === 0 ? R * 0.30 : R * 0.17);
+              ctx.fillStyle = bone;
               ctx.beginPath(); ctx.arc(Math.cos(ea) * er, Math.sin(ea) * er, es, 0, TAU); ctx.fill();
               ctx.fillStyle = iris;
               ctx.beginPath(); ctx.arc(Math.cos(ea) * er, Math.sin(ea) * er, es * 0.6, 0, TAU); ctx.fill();
-              ctx.fillStyle = '#0b0010';
+              ctx.fillStyle = dark;
               ctx.beginPath(); ctx.arc(Math.cos(ea) * er, Math.sin(ea) * er, es * 0.28, 0, TAU); ctx.fill();
             }
-          } else if (arch === 2) {
-            /* 蛛形：甲壳 + 八条节肢 + 螯牙 */
-            ctx.fillStyle = col;
-            for (var lg = 0; lg < 8; lg++) {
+          } else if (d.fam === 2) {
+            /* 蛛形：甲壳 + 随层变化的节肢数量 + 螯牙 */
+            var nleg = d.legs;
+            for (var lg = 0; lg < nleg; lg++) {
               var side = lg % 2 ? 1 : -1, li = Math.floor(lg / 2);
-              var la = (-0.9 + li * 0.6) * side;
+              var span = Math.max(1, Math.floor(nleg / 2));
+              var la = (-0.95 + (li / Math.max(1, span - 1)) * 1.75) * side;
               var sway = Math.sin(e.t * 6 + lg) * 0.18;
-              var kx1 = Math.cos(la) * r * 1.15, ky1 = Math.sin(la) * r * 1.15;
-              var kx2 = Math.cos(la + sway) * r * 1.95, ky2 = Math.sin(la + sway) * r * 1.95;
-              ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, r * 0.14);
+              var kx1 = Math.cos(la) * R * 1.15, ky1 = Math.sin(la) * R * 1.15;
+              var kx2 = Math.cos(la + sway) * R * 1.95, ky2 = Math.sin(la + sway) * R * 1.95;
+              ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, R * 0.13);
               ctx.beginPath();
-              ctx.moveTo(Math.cos(la) * r * 0.55, Math.sin(la) * r * 0.55);
+              ctx.moveTo(Math.cos(la) * R * 0.55, Math.sin(la) * R * 0.55);
               ctx.lineTo(kx1, ky1);
               ctx.lineTo(kx2, ky2);
               ctx.stroke();
             }
             ctx.fillStyle = col;
-            ctx.beginPath(); ctx.ellipse(0, 0, r * 0.95, r * 0.82, 0, 0, TAU); ctx.fill();
-            ctx.fillStyle = '#1a0614';
-            ctx.beginPath(); ctx.ellipse(r * 0.12, 0, r * 0.66, r * 0.54, 0, 0, TAU); ctx.fill();
-            ctx.fillStyle = iris;
-            ctx.beginPath(); ctx.arc(r * 0.52, -r * 0.26, r * 0.14, 0, TAU); ctx.fill();
-            ctx.beginPath(); ctx.arc(r * 0.52, r * 0.26, r * 0.14, 0, TAU); ctx.fill();
-            ctx.strokeStyle = '#fff2d4'; ctx.lineWidth = Math.max(2, r * 0.10);
+            ctx.beginPath(); ctx.ellipse(0, 0, R * 0.95, R * 0.82, 0, 0, TAU); ctx.fill();
+            ctx.fillStyle = dark;
+            ctx.beginPath(); ctx.ellipse(R * 0.12, 0, R * 0.66, R * 0.54, 0, 0, TAU); ctx.fill();
+            var sazm = Math.min(4, 1 + d.eyes);
+            for (var q2 = 0; q2 < sazm; q2++) {
+              var qa = -0.55 + q2 * (1.1 / Math.max(1, sazm - 1));
+              ctx.fillStyle = iris;
+              ctx.beginPath(); ctx.arc(R * 0.5, R * qa * 0.55, R * 0.13, 0, TAU); ctx.fill();
+            }
+            ctx.strokeStyle = bone; ctx.lineWidth = Math.max(2, R * 0.10);
             for (var mg = 0; mg < 2; mg++) {
               var ms = mg ? 1 : -1;
               ctx.beginPath();
-              ctx.moveTo(r * 0.72, ms * r * 0.22);
-              ctx.quadraticCurveTo(r * 1.18, ms * r * 0.40, r * 1.34, ms * r * 0.06);
+              ctx.moveTo(R * 0.72, ms * R * 0.22);
+              ctx.quadraticCurveTo(R * 1.18, ms * R * 0.40, R * 1.34, ms * R * 0.06);
               ctx.stroke();
             }
           } else {
-            /* 蛇形：分节躯体 + 三角蛇头 + 分叉信子 */
-            ctx.fillStyle = col;
-            for (var sg = 5; sg >= 1; sg--) {
-              var sd = r * 0.62 * sg;
-              var off = Math.sin(e.t * 3.2 - sg * 0.7) * r * 0.30;
-              ctx.globalAlpha = 0.85 - sg * 0.07;
+            /* 蛇形：分节躯体（节数随层）+ 三角蛇头 + 分叉信子 */
+            var nsg = d.segs;
+            for (var sg = nsg; sg >= 1; sg--) {
+              var sd = R * (0.62 - 0.36 / nsg) * sg;
+              var off = Math.sin(e.t * 3.2 * (d.wob || 1) - sg * 0.7) * R * 0.30;
+              ctx.globalAlpha = 0.88 - (sg / nsg) * 0.45;
               ctx.beginPath();
-              ctx.ellipse(-sd, off, r * (0.72 - sg * 0.07), r * (0.56 - sg * 0.05), 0, 0, TAU); ctx.fill();
+              ctx.ellipse(-sd, off, R * (0.74 - sg * 0.055), R * (0.58 - sg * 0.040), 0, 0, TAU); ctx.fill();
             }
             ctx.globalAlpha = 1;
             ctx.beginPath();
-            ctx.moveTo(r * 1.34, 0);
-            ctx.lineTo(-r * 0.10, -r * 0.86);
-            ctx.lineTo(-r * 0.62, 0);
-            ctx.lineTo(-r * 0.10, r * 0.86);
+            ctx.moveTo(R * 1.34, 0);
+            ctx.lineTo(-R * 0.10, -R * 0.86);
+            ctx.lineTo(-R * 0.62, 0);
+            ctx.lineTo(-R * 0.10, R * 0.86);
             ctx.closePath(); ctx.fill();
-            ctx.fillStyle = '#0d1a10';
+            ctx.fillStyle = dark;
             ctx.beginPath();
-            ctx.moveTo(r * 1.20, 0); ctx.lineTo(-r * 0.02, -r * 0.48);
-            ctx.lineTo(-r * 0.02, r * 0.48); ctx.closePath(); ctx.fill();
-            ctx.fillStyle = iris;
-            ctx.beginPath(); ctx.arc(r * 0.42, -r * 0.32, r * 0.15, 0, TAU); ctx.fill();
-            ctx.beginPath(); ctx.arc(r * 0.42, r * 0.32, r * 0.15, 0, TAU); ctx.fill();
+            ctx.moveTo(R * 1.20, 0); ctx.lineTo(-R * 0.02, -R * 0.48);
+            ctx.lineTo(-R * 0.02, R * 0.48); ctx.closePath(); ctx.fill();
+            var snEye = Math.min(3, 1 + Math.floor(d.eyes / 3));
+            for (var se2 = 0; se2 < snEye; se2++) {
+              ctx.fillStyle = iris;
+              ctx.beginPath(); ctx.arc(R * (0.42 - se2 * 0.22), -R * 0.32, R * 0.15, 0, TAU); ctx.fill();
+              ctx.beginPath(); ctx.arc(R * (0.42 - se2 * 0.22), R * 0.32, R * 0.15, 0, TAU); ctx.fill();
+            }
             var fl = Math.sin(e.t * 9);
             if (fl > 0.2) {
-              ctx.strokeStyle = '#ff5c7a'; ctx.lineWidth = Math.max(1.6, r * 0.07);
+              ctx.strokeStyle = iris; ctx.lineWidth = Math.max(1.6, R * 0.07);
               ctx.beginPath();
-              ctx.moveTo(r * 1.30, 0); ctx.lineTo(r * 1.60, 0);
-              ctx.moveTo(r * 1.60, 0); ctx.lineTo(r * 1.78, -r * 0.14);
-              ctx.moveTo(r * 1.60, 0); ctx.lineTo(r * 1.78, r * 0.14);
+              ctx.moveTo(R * 1.30, 0); ctx.lineTo(R * 1.60, 0);
+              ctx.moveTo(R * 1.60, 0); ctx.lineTo(R * 1.78, -R * 0.14);
+              ctx.moveTo(R * 1.60, 0); ctx.lineTo(R * 1.78, R * 0.14);
               ctx.stroke();
             }
           }
-          /* 进化世代：额外棘刺 + 外环裂纹，越深的同名形态也不一样 */
-          if (e.gen > 0) {
-            ctx.strokeStyle = col; ctx.lineWidth = 2.2;
-            ctx.globalAlpha = 0.75;
-            var spikes = 6 + e.gen * 2;
-            for (var gs = 0; gs < spikes; gs++) {
-              var ga = gs * TAU / spikes + e.t * 0.5;
+
+          /* 通用基因层①：角冠（0~3 支，越长越深） */
+          if (d.horns > 0) {
+            ctx.fillStyle = bone; ctx.globalAlpha = 0.9;
+            for (var hn = 0; hn < d.horns; hn++) {
+              var ha = -Math.PI / 2 + (hn - (d.horns - 1) / 2) * 0.62;
+              var hb = R * 1.02, ht2 = R * (1.55 + d.gen * 0.10);
               ctx.beginPath();
-              ctx.moveTo(Math.cos(ga) * r * 1.02, Math.sin(ga) * r * 1.02);
-              ctx.lineTo(Math.cos(ga + 0.06) * r * (1.32 + e.gen * 0.06), Math.sin(ga + 0.06) * r * (1.32 + e.gen * 0.06));
-              ctx.stroke();
+              ctx.moveTo(Math.cos(ha) * hb - R * 0.13, Math.sin(ha) * hb);
+              ctx.lineTo(Math.cos(ha) * ht2, Math.sin(ha) * ht2);
+              ctx.lineTo(Math.cos(ha) * hb + R * 0.13, Math.sin(ha) * hb);
+              ctx.closePath(); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+          }
+          /* 通用基因层②：外棘刺（数量随层，长度随世代） */
+          ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.globalAlpha = 0.72;
+          var sp = d.spikes;
+          for (var gs = 0; gs < sp; gs++) {
+            var ga = gs * TAU / sp + e.t * 0.5;
+            var len = R * (1.30 + (d.gen || 0) * 0.06);
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(ga) * R * 1.02, Math.sin(ga) * R * 1.02);
+            ctx.lineTo(Math.cos(ga + 0.06) * len, Math.sin(ga + 0.06) * len);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+          /* 通用基因层③：斑纹（0~3 组） */
+          if (d.spots > 0) {
+            ctx.fillStyle = dark; ctx.globalAlpha = 0.55;
+            for (var sk = 0; sk < d.spots * 3; sk++) {
+              var ska = sk * TAU / (d.spots * 3) + e.t * 0.25;
+              var skr = R * (0.45 + (sk % 2) * 0.26);
+              ctx.beginPath();
+              ctx.arc(Math.cos(ska) * skr, Math.sin(ska) * skr, R * (0.07 + (sk % 3) * 0.02), 0, TAU);
+              ctx.fill();
             }
             ctx.globalAlpha = 1;
           }
           /* 核心光点（狂暴时更亮） */
           ctx.fillStyle = ph ? '#ffe14d' : '#ffffff';
           ctx.globalAlpha = 0.55 + Math.sin(e.t * 5) * 0.25;
-          ctx.beginPath(); ctx.arc(0, 0, r * 0.16, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(0, 0, R * 0.16, 0, TAU); ctx.fill();
           ctx.globalAlpha = 1;
           ctx.restore();
           break;

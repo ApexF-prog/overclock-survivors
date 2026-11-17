@@ -383,14 +383,12 @@
     var e = new NS.Enemy('boss', p.x + Math.cos(a) * dist, p.y + Math.sin(a) * dist,
       1 + this.bossIndex * 0.55, 1 + this.time / 900);
     e.name = D.bossNames[Math.min(D.bossNames.length - 1, this.bossIndex - 1)];
-    /* v10：每层首领换一种怪物形态（0 巨口兽 / 1 多眼体 / 2 蛛形 / 3 蛇形），
-     * 第 5 层起进入下一世代：换配色并长出额外棘刺，避免「同一个 BOSS 无限重复」 */
-    e.arch = (this.bossIndex - 1) % 4;
-    e.gen = Math.floor((this.bossIndex - 1) / 4);
-    if (e.gen > 0) {
-      var PAL = ['#ff2f8e', '#38d6ff', '#ffb03a', '#a06bff'];
-      e.color = PAL[e.gen % PAL.length];
-    }
+    /* v12：与 systems.js 保持一致——形态来自按层号生成的基因，而不是 4 种循环 */
+    var dna0 = NS.bossDNA ? NS.bossDNA(this.bossIndex) : null;
+    e.dna = dna0;
+    e.arch = dna0 ? dna0.fam : (this.bossIndex - 1) % 4;
+    e.gen = dna0 ? dna0.gen : Math.floor((this.bossIndex - 1) / 4);
+    if (dna0) e.color = dna0.color;
     this.enemies.push(e);
     this.boss = e;
     this.fx.addFlash(0.35, '255,60,140');
