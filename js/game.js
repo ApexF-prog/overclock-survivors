@@ -374,6 +374,8 @@
         sc.hp, sc.speed, sc.damage));
     }
   };
+  /* 注意：本函数随后被 systems.js 的 G.spawnBoss 整体覆盖（后者才是实际生效的版本）。
+     保留仅作早期版本回退参考，修改首领生成请改 systems.js，否则改动不会生效。 */
   Game.prototype.spawnBoss = function () {
     var p = this.player;
     this.bossIndex++;

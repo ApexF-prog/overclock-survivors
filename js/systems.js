@@ -617,6 +617,16 @@
     e.fs = f; e.floor = f;
     e.radius = 52 * Math.min(1.5, 1 + (f - 1) * 0.035);
     e.name = D.bossNames[(f - 1) % D.bossNames.length] + ' · L' + f;
+    /* v12 修复：本函数覆盖了 game.js 的 spawnBoss，但当时没把形态写进实体，
+       导致 visuals 里 `e.arch || 0` 永远落到第 0 种——每层首领长得一模一样。
+       现在按层轮换四种怪兽：0 巨口兽 / 1 多眼体 / 2 蛛形 / 3 蛇形；
+       每 4 层进入下一世代（换配色 + 额外棘刺），保证深层不重样。 */
+    e.arch = (f - 1) % 4;
+    e.gen = Math.floor((f - 1) / 4);
+    if (e.gen > 0) {
+      var PAL = ['#ff2f8e', '#38d6ff', '#ffb03a', '#a06bff'];
+      e.color = PAL[e.gen % PAL.length];
+    }
     /* v5：奖励随血量同步指数成长，避免「打半天只掉几颗宝石」 */
     var hpk = Math.pow(Math.max(1, hpMul) / 2.2, 0.36);
     e.xp = Math.round(70 * hpk);

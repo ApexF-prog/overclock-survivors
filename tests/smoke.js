@@ -238,6 +238,7 @@ const probe = new NS.Game(canvas, { bindInput: false, quality: 'high', volume: 0
 probe.start();
 probe.player.hp = 1e9; probe.player.maxHp = 1e9;
 const bossHpByFloor = [], mobHpByFloor = [], mobDmgByFloor = [], affixesByFloor = [];
+const bossArchByFloor = [], bossGenByFloor = [];
 let bossCapOk = false, waveProduced = true;
 for (let lv = 1; lv <= 6; lv++) {
   probe.floor = lv;
@@ -248,6 +249,8 @@ for (let lv = 1; lv <= 6; lv++) {
   const b = probe.boss;
   bossHpByFloor.push(b.maxHp);
   affixesByFloor.push(b.affList ? b.affList.length : 0);
+  bossArchByFloor.push(b.arch);
+  bossGenByFloor.push(b.gen);
   if (lv === 1) {
     const before = b.hp;
     probe.damageEnemy(b, 1e9, '#fff', 0, 1, 0);   // 模拟后期超高 DPS 的一击
@@ -263,6 +266,11 @@ for (let lv = 1; lv <= 6; lv++) {
   mobDmgByFloor.push(ref.damage);
 }
 const bossGrows = bossHpByFloor.every((v, i) => i === 0 || v > bossHpByFloor[i - 1]);
+/* v12：首领形态必须按层轮换（0 巨口兽 / 1 多眼体 / 2 蛛形 / 3 蛇形），每 4 层换世代。
+   之前 systems.js 覆盖了 spawnBoss 却漏写 e.arch，导致每层都画成第一种。 */
+const bossArchOk = bossArchByFloor.every((v, i) => v === i % 4) &&
+  new Set(bossArchByFloor).size === 4;
+const bossGenOk = bossGenByFloor[0] === 0 && bossGenByFloor[3] === 0 && bossGenByFloor[4] === 1;
 const mobGrows = waveProduced && mobHpByFloor[5] > mobHpByFloor[0] &&
   mobDmgByFloor[5] > mobDmgByFloor[0] &&
   mobHpByFloor.every((v, i) => i === 0 || v >= mobHpByFloor[i - 1]);
@@ -473,6 +481,8 @@ const checks = [
     '第 ' + game.floor + ' 层 · ' + game.floorState + ' · 击破 ' + game.bossKills + ' 只'],
   ['首领逐层变强', bossGrows,
     'L1 ' + bossHpByFloor[0] + ' → L6 ' + bossHpByFloor[5] + ' HP'],
+  ['首领形态逐层轮换', bossArchOk && bossGenOk,
+    'arch ' + bossArchByFloor.join('→') + ' / gen ' + bossGenByFloor.join('→')],
   ['小怪逐层变强', mobGrows,
     'HP ' + mobHpByFloor[0] + '→' + mobHpByFloor[5] + ' / 伤害 ' + mobDmgByFloor[0] + '→' + mobDmgByFloor[5]],
   ['首领不被瞬秒', bossCapOk, '单次受伤 ≤ 最大生命 3.5%'],
