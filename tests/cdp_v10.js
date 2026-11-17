@@ -84,7 +84,9 @@ function cdpGet(url) {
   out.errList = await ev("JSON.stringify(__errs)");
   console.log(JSON.stringify(out, null, 2));
 
-  const ok = out.version === 'V10.0' && /v10\.0/.test(out.menuEyebrow) && out.phaseTicks === 2 &&
+  /* 版本号随迭代前进，这里只校验「不低于 v10」且主菜单 eyebrow 同步 */
+  const verNum = parseFloat(String(out.version).replace('V', '')) || 0;
+  const ok = verNum >= 10 && /PROTOCOL v\d+\.\d+/.test(out.menuEyebrow) && out.phaseTicks === 2 &&
     out.pauseInfoBox && out.settingsBtns && out.muteCheckbox && out.shareBtn &&
     out.hintVisible && out.pauseScreen && out.pauseCells === 6 && out.pauseChips >= 1 &&
     out.hintHiddenOnPause && /enraged/.test(out.enrageClass) && /gradient/.test(out.enrageFill) &&
