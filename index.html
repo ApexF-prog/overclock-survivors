@@ -40,6 +40,8 @@
       </div>
     </div>
 
+    <div id="control-hint" class="control-hint hidden"></div>
+
     <div id="daily-hud" class="daily-hud hidden">
       <span class="dh-tag">📅 今日挑战</span>
       <span id="dh-goal" class="dh-goal">目标 第 3 层</span>
@@ -54,7 +56,7 @@
         <span id="boss-name">首领</span>
         <span id="boss-hp-text" class="boss-hp-text">100%</span>
       </div>
-      <div class="bar boss-bar"><div id="boss-fill" class="bar-fill"></div></div>
+      <div class="bar boss-bar"><div id="boss-fill" class="bar-fill"></div><i class="phase-tick" style="left:50%"></i><i class="phase-tick crit" style="left:22%"></i></div>
       <div id="boss-affix" class="boss-affix"></div>
     </div>
 
@@ -118,7 +120,7 @@
     <div class="portal-wrap">
       <header class="portal-head">
         <div class="p-brand"><span class="p-brand-cn">超频幸存者</span><span class="p-brand-en">OVERCLOCK SURVIVORS · 无尽炼狱</span></div>
-        <div class="p-head-right"><span class="p-online">● 在线 <b id="p-online">12,486</b></span><span class="p-ver">V6.0</span></div>
+        <div class="p-head-right"><span class="p-online">● 在线 <b id="p-online">12,486</b></span><span class="p-ver">V10.0</span></div>
       </header>
       <div class="portal-main">
         <div class="portal-left">
@@ -216,7 +218,7 @@
   <!-- ============ 主菜单 ============ -->
   <section id="screen-menu" class="screen">
     <div class="menu-wrap">
-      <div class="eyebrow">ARCADE // ENDLESS INFERNO PROTOCOL v4.0</div>
+      <div class="eyebrow">ARCADE // ENDLESS INFERNO PROTOCOL v10.0</div>
       <h1 class="logo"><span class="logo-cn">超频幸存者</span><span class="logo-en">OVERCLOCK SURVIVORS</span></h1>
       <p class="tagline">无尽炼狱 · 没有终点，只有一层比一层更强的首领<br>每次升级三选一「海克斯强化」，抽出自动拾取 / 击杀吸血 / 超武蓝图，构筑属于你的一局</p>
       <div id="best-line" class="best-line">最高分 0 · 最深 1 层 · 最长存活 00:00</div>
@@ -226,7 +228,7 @@
         <button id="btn-settings" class="btn">设置</button>
         <button id="btn-account" class="btn">账号中心 / 切换难度</button>
       </div>
-      <div class="menu-foot">WASD 移动 · SPACE 冲刺 · Q 释放 EMP · 1/2/3 选强化 · R 重掷 · P 暂停</div>
+      <div class="menu-foot">WASD 移动 · SPACE 冲刺 · Q 释放 EMP · 1/2/3 选强化 · R 重掷 · P 暂停 · M 静音</div>
     </div>
   </section>
 
@@ -250,7 +252,9 @@
         <div class="help-item"><b>挑战难度</b><span>门户里选 标准 / 精英 / 炼狱 / 无尽噩梦，敌人与首领强度、刷怪密度、准备波时长与分数倍率同步变化</span></div>
         <div class="help-item"><b>炼狱契约</b><span>击破首领进入下一层时三选一：接受诅咒换强力收益（伤害、分数、暴击、宝箱…），本局永久叠加；也可跳过稳妥推进</span></div>
         <div class="help-item"><b>首领词缀</b><span>第 2 层起首领附带随机词缀：壁垒减伤 / 噬主回血 / 崩解弹幕 / 狂血加速 / 群噬召唤 / 蚀界灼烧，层数越深词缀越多</span></div>
-        <div class="help-item"><b>P / ESC</b><span>暂停游戏；触屏用左侧摇杆 + 右下冲刺 / EMP 按钮</span></div>
+        <div class="help-item"><b>P / ESC</b><span>暂停游戏并显示本局构筑快照；切到其他窗口 / 切后台会自动暂停，不会在你看不见的时候被围死</span></div>
+        <div class="help-item"><b>M</b><span>一键静音 / 取消静音，保留音量设置；适合上课或开会时突然需要安静</span></div>
+        <div class="help-item"><b>触屏</b><span>左侧摇杆移动，右下角冲刺 / EMP 按钮；桌面端可全屏获得更大视野</span></div>
       </div>
       <div class="help-note">无尽炼狱没有通关：只有阵亡才结束，越深越强。每通过一层会回复生命、补充能量、投放稀有宝箱并签订契约；卡顿时自动降低特效负载。看看你能到第几层。</div>
       <button id="btn-help-back" class="btn btn-primary">返回</button>
@@ -262,11 +266,19 @@
     <div class="panel narrow">
       <h2>设置</h2>
       <label class="set-row"><span>音量</span><input id="set-volume" type="range" min="0" max="100" value="60"><b id="set-volume-val">60%</b></label>
+      <label class="set-row"><span>音乐音量</span><input id="set-music-vol" type="range" min="0" max="100" value="90"><b id="set-music-vol-val">90%</b></label>
+      <label class="set-row"><span>背景音乐</span><input id="set-music-on" type="checkbox" checked></label>
+      <label class="set-row"><span>全局静音 <em>M</em></span><input id="set-muted" type="checkbox"></label>
       <label class="set-row"><span>画质</span><select id="set-quality"><option value="high">高 · 完整辉光 + Bloom</option><option value="medium">中 · 均衡</option><option value="low">低 · 省电（关闭泛光）</option></select></label>
       <label class="set-row"><span>辉光泛光</span><input id="set-bloom" type="checkbox" checked></label>
       <label class="set-row"><span>目标帧率</span><select id="set-fps"><option value="auto">自动 · 流畅优先（推荐）</option><option value="60">60 FPS · 省电稳定</option><option value="90">90 FPS · 均衡</option><option value="120">120 FPS · 高刷</option><option value="144">144 FPS · 极致</option></select></label>
       <label class="set-row"><span>屏幕震动</span><input id="set-shake" type="checkbox" checked></label>
-      <p id="perf-hint" class="help-note">自动档会按真实帧时间动态调整渲染分辨率与泛光，密集场景也不掉帧。高刷档需显示器支持（60Hz 屏无法超过 60）。所有音效由 Web Audio 实时合成；设置自动保存。</p>
+      <p id="perf-hint" class="help-note">自动档会按真实帧时间动态调整渲染分辨率与泛光，密集场景也不掉帧。高刷档需显示器支持（60Hz 屏无法超过 60）。所有音效由 Web Audio 实时合成；设置自动保存。局内按 <b>M</b> 可随时静音，切到其他窗口会自动暂停。</p>
+      <div class="set-danger">
+        <button id="btn-reset-settings" type="button" class="btn btn-sm">恢复默认设置</button>
+        <button id="btn-wipe-save" type="button" class="btn btn-sm btn-danger">清除本机全部存档</button>
+      </div>
+      <p class="help-note dim">「清除存档」会删除本机的账号、超频核心、研究所等级与纪录，只影响这台设备，无法恢复。</p>
       <button id="btn-settings-back" class="btn btn-primary">返回</button>
     </div>
   </section>
@@ -286,7 +298,8 @@
   <section id="screen-pause" class="screen hidden">
     <div class="panel narrow center">
       <h2>已暂停</h2>
-      <p class="sub">系统待机中</p>
+      <p class="sub">系统待机中 · 音乐已压低</p>
+      <div id="pause-info" class="pause-info"></div>
       <div class="stack-btns">
         <button id="btn-resume" class="btn btn-primary">继续游戏</button>
         <button id="btn-restart" class="btn">重新开始</button>
@@ -305,6 +318,7 @@
       <div id="result-build" class="result-build"></div>
       <div class="stack-btns">
         <button id="btn-again" class="btn btn-primary">再来一局 <span class="key-hint">ENTER</span></button>
+        <button id="btn-share" class="btn">复制本局战绩</button>
         <button id="btn-menu" class="btn">返回主菜单</button>
       </div>
     </div>

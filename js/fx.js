@@ -113,9 +113,41 @@
     }
   };
   FX.prototype.addFlash = function (v, rgb) { this.flash = Math.min(1, this.flash + v); if (rgb) this.flashColor = rgb; };
+
+  /* ---- v10 新增打击 / 技能特效原语 ---- */
+  /* 冲击波：一圈快环 + 一圈慢环 + 放射状火花，用于首领登场、EMP、升级 */
+  FX.prototype.shock = function (x, y, r, color) {
+    this.ring(x, y, 6, r, color, 5, 0.38);
+    this.ring(x, y, 2, r * 0.62, '#ffffff', 2.5, 0.5);
+    var n = this.quality === 'low' ? 6 : 14;
+    for (var i = 0; i < n; i++) {
+      var a = i / n * U.TAU + U.rand(-0.1, 0.1), v = U.rand(r * 1.4, r * 2.6);
+      this._spawn(x, y, Math.cos(a) * v, Math.sin(a) * v, U.rand(0.24, 0.46), U.rand(1.6, 3.4), color, 0, 0.90, 0);
+    }
+    this.addShake(3.5);
+  };
+  /* 斩击弧：绕中心扫过一段弧形亮带，用于近战 / 冲刺 / 爆发技能 */
+  FX.prototype.slash = function (x, y, angle, radius, color, spread, life) {
+    if (this.blades === undefined) this.blades = [];
+    if (this.blades.length > 20) this.blades.shift();
+    this.blades.push({
+      x: x, y: y, a: angle, r: radius || 60,
+      spread: spread == null ? 1.5 : spread,
+      color: color || '#bff8ff', t: 0, life: life || 0.22
+    });
+  };
+  /* 星芒爆裂：十字长条闪光，暴击 / 击杀的瞬间高光 */
+  FX.prototype.star = function (x, y, color, size, life) {
+    if (this.stars === undefined) this.stars = [];
+    if (this.stars.length > 24) this.stars.shift();
+    this.stars.push({ x: x, y: y, color: color || '#ffe14d', s: size || 22, t: 0, life: life || 0.26, rot: U.rand(0, 1.6) });
+  };
+
   FX.prototype.clear = function () {
     this.parts.clear(); this.rings.length = 0; this.texts.length = 0;
     this.beams.length = 0; this.afterimages.length = 0; this.arcs.length = 0;
+    if (this.blades) this.blades.length = 0;
+    if (this.stars) this.stars.length = 0;
     this.shake = 0; this.flash = 0; this.zoom = 0; this._dx = this._dy = 0;
   };
 
@@ -150,6 +182,14 @@
     for (i = this.arcs.length - 1; i >= 0; i--) {
       this.arcs[i].t += dt;
       if (this.arcs[i].t >= this.arcs[i].life) this.arcs.splice(i, 1);
+    }
+    if (this.blades) for (i = this.blades.length - 1; i >= 0; i--) {
+      this.blades[i].t += dt;
+      if (this.blades[i].t >= this.blades[i].life) this.blades.splice(i, 1);
+    }
+    if (this.stars) for (i = this.stars.length - 1; i >= 0; i--) {
+      this.stars[i].t += dt;
+      if (this.stars[i].t >= this.stars[i].life) this.stars.splice(i, 1);
     }
     this.shake *= Math.pow(0.86, dt * 60);
     if (this.shake < 0.15) this.shake = 0;
@@ -209,6 +249,37 @@
       for (var q = 1; q < ar.pts.length; q++) ctx.lineTo(ar.pts[q].x, ar.pts[q].y);
       ctx.stroke();
       ctx.globalAlpha = ak * 0.35; ctx.lineWidth = ar.w * ak * 3.5; ctx.stroke();
+    }
+    /* 斩击弧 */
+    if (this.blades) {
+      ctx.lineCap = 'round';
+      for (i = 0; i < this.blades.length; i++) {
+        var bl = this.blades[i], bk = 1 - bl.t / bl.life;
+        ctx.globalAlpha = bk * 0.9;
+        ctx.strokeStyle = bl.color;
+        ctx.lineWidth = 2 + 8 * bk;
+        ctx.beginPath();
+        ctx.arc(bl.x, bl.y, bl.r, bl.a - bl.spread / 2, bl.a + bl.spread / 2);
+        ctx.stroke();
+        ctx.globalAlpha = bk * 0.30;
+        ctx.lineWidth = (2 + 8 * bk) * 2.6;
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+    }
+    /* 星芒爆裂 */
+    if (this.stars) {
+      for (i = 0; i < this.stars.length; i++) {
+        var st = this.stars[i], sk = 1 - st.t / st.life;
+        var L = st.s * (0.35 + sk * 0.85);
+        ctx.globalAlpha = sk;
+        ctx.strokeStyle = st.color;
+        ctx.lineWidth = 2 + 3.5 * sk;
+        ctx.beginPath();
+        ctx.moveTo(st.x - L, st.y); ctx.lineTo(st.x + L, st.y);
+        ctx.moveTo(st.x, st.y - L); ctx.lineTo(st.x, st.y + L);
+        ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
     ctx.restore();

@@ -268,6 +268,8 @@
 
   function afterLogin(res) {
     if (!res.ok) return false;
+    /* 登录成功音：门户里唯一的一次性确认音 */
+    if (NS.Audio) { NS.Audio.resume(); NS.Audio.play('login'); }
     rebindUI();
     render();
     return true;
@@ -359,6 +361,32 @@
   renderAvatars();
   renderNotices();
   render();
+
+  /* ---------------- 门户 / 登录界面音乐 ----------------
+   * 浏览器要求用户手势后才允许出声，所以先 init（挂起态），
+   * 首次点击或按键时 resume 并播放门户曲目「menu」。
+   */
+  var musicArmed = false;
+  function armMusic() {
+    if (musicArmed) return;
+    musicArmed = true;
+    try {
+      var st = (NS.U && NS.U.Save ? (NS.U.Save.peek ? NS.U.Save.peek() : NS.U.Save.load().settings) : null) || {};
+      NS.Audio.init(st.volume, st.musicVol);
+      NS.Audio.setMusicEnabled(st.musicOn !== false);
+      NS.Audio.resume();
+      if (P.isOpen() || (NS.game && NS.game.state === 'menu')) NS.Audio.music('menu');
+    } catch (e) { /* 音频异常不影响门户 */ }
+  }
+  doc.addEventListener('pointerdown', armMusic, { passive: true });
+  doc.addEventListener('keydown', armMusic);
+
+  /* 回到门户时切回门户音乐（结算后、切换账号等） */
+  var _showPortal = P.show;
+  P.show = function () {
+    _showPortal();
+    if (musicArmed) NS.Audio.music('menu');
+  };
 
   if (AUTOTEST) P.hide();   // 无头自动验证模式跳过门户
 })(typeof window !== 'undefined' ? window : globalThis);

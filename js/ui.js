@@ -40,10 +40,93 @@
     var showHud = (name === null || name === 'pause' || name === 'levelup' || name === 'result' || name === 'contract');
     $('hud').classList.toggle('hidden', !showHud);
     $('touch-controls').classList.toggle('hidden', !(isTouch && name === null));
+    if (name !== null) hideControlHint();
+    if (name === 'pause') renderPauseInfo();
   }
 
-  function refreshBest() {
-    /* 直接读当前档案的持久化数据，切换账号后菜单纪录不会显示上一个档案的缓存 */
+  /* v10：暂停面板显示本局战术快照，不用退出就能复盘构筑 */
+  function renderPauseInfo() {
+    var box = $('pause-info');
+    if (!box) return;
+    var p = game.player || {};
+    var syn = (NS.Synergy && game.hex) ? NS.Synergy.summary(game) : null;
+    var formed = syn ? syn.filter(function (s) { return s.tier > 0; }) : [];
+    box.innerHTML = '';
+    var cells = [
+      ['层数', '第 ' + (game.floor || 1) + ' 层'],
+      ['存活', U.fmtTime(game.time || 0)],
+      ['击杀', game.kills || 0],
+      ['等级', 'LV ' + (p.level || 1)],
+      ['分数', Math.round(game.score || 0)],
+      ['生命', Math.round(p.hp || 0) + '/' + Math.max(1, Math.round(p.maxHp || 0))]
+    ];
+    for (var i = 0; i < cells.length; i++) {
+      var c = doc.createElement('div');
+      c.className = 'pause-cell';
+      var lab = doc.createElement('span'); lab.textContent = cells[i][0];
+      var val = doc.createElement('b'); val.textContent = cells[i][1];
+      c.appendChild(lab); c.appendChild(val);
+      box.appendChild(c);
+    }
+    var row = doc.createElement('div');
+    row.className = 'pause-build';
+    var ws = p.weapons || [];
+    for (var w = 0; w < ws.length; w++) {
+      var d = D.weaponById[ws[w].id];
+      var chip = doc.createElement('span');
+      chip.className = 'pause-chip';
+      chip.textContent = (d ? d.icon + ' ' + d.name : ws[w].id) + (ws[w].evolved ? ' · EVO' : ' · LV' + ws[w].level);
+      if (d) chip.style.borderColor = d.color;
+      row.appendChild(chip);
+    }
+    for (var s = 0; s < formed.length; s++) {
+      var sc = doc.createElement('span');
+      sc.className = 'pause-chip syn';
+      sc.textContent = '◆ ' + formed[s].name + ' ' + formed[s].tier + ' 阶';
+      sc.style.borderColor = formed[s].color;
+      sc.style.color = formed[s].color;
+      row.appendChild(sc);
+    }
+    if (!ws.length && !formed.length) {
+      var none = doc.createElement('span');
+      none.className = 'pause-chip';
+      none.textContent = '尚无构筑';
+      row.appendChild(none);
+    }
+    box.appendChild(row);
+  }
+
+  /* v10：开局几秒的操作提示（触屏 / 键鼠分别提示），不打断老玩家 */
+  var hintTimer = null;
+  function showControlHint() {
+    var el = $('control-hint');
+    if (!el) return;
+    el.innerHTML = isTouch
+      ? '左摇杆移动 · 右下 <b>冲刺</b> / <b>EMP</b> · 武器全自动开火'
+      : '<b>WASD</b> 移动 · <b>SPACE</b> 冲刺 · <b>Q</b> EMP · <b>P</b> 暂停 · <b>M</b> 静音';
+    el.classList.remove('hidden');
+    root.requestAnimationFrame(function () { el.classList.add('on'); });
+    if (hintTimer) clearTimeout(hintTimer);
+    hintTimer = setTimeout(hideControlHint, 6500);
+  }
+  function hideControlHint() {
+    var el = $('control-hint');
+    if (!el) return;
+    if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
+    el.classList.remove('on');
+    el.classList.add('hidden');
+  }
+
+  /* v10：全局静音（M），只压 master，不动用户设的音量 */
+  function toggleMute() {
+    var on = NS.Audio.toggleMute();
+    save.settings.muted = !!on;
+    U.Save.save();
+    showToast(on ? '🔇 已静音 · 按 M 恢复' : '🔊 声音已恢复', !!on, true);
+    if (!on) NS.Audio.play('select');
+  }
+
+  function refreshBest() {    /* 直接读当前档案的持久化数据，切换账号后菜单纪录不会显示上一个档案的缓存 */
     var prof = NS.Account && NS.Account.current();
     var s = (prof && prof.stats) || save;
     $('best-line').textContent = '最深第 ' + Math.max(1, s.bestFloor || 1) + ' 层' +
@@ -100,7 +183,9 @@
   }
 
   function startGame() {
-    NS.Audio.init(save.settings.volume);
+    NS.Audio.init(save.settings.volume, save.settings.musicVol == null ? 0.9 : save.settings.musicVol);
+    NS.Audio.setMusicEnabled(save.settings.musicOn !== false);
+    NS.Audio.setMute(save.settings.muted === true);
     NS.Audio.resume();
     $('event-banner').classList.add('hidden');
     $('combo-box').classList.add('hidden');
@@ -118,6 +203,7 @@
       $('diff-text').style.color = game.diff.color;
     }
     $('contract-text').textContent = '0';
+    showControlHint();
   }
 
   /* ---------------- 事件总线 ---------------- */
@@ -132,6 +218,7 @@
       case 'toast': showToast(data.text, data.danger, data.long); break;
       case 'frame':
         updateHud(data);
+        heartbeat(data);
         if (lootQueue && current === null) flushLoot();
         break;
       case 'event': showEvent(data); break;
@@ -183,6 +270,17 @@
   }
 
   /* ---------------- HUD ---------------- */
+  /* v10：残血心跳 —— 血量越低间隔越短，配合屏幕红晕给出压力反馈 */
+  var heartNext = 0;
+  function heartbeat(d) {
+    if (!d || game.state !== 'playing') { heartNext = 0; return; }
+    var r = d.hp / Math.max(1, d.maxHp);
+    if (r > 0.32) { heartNext = 0; return; }
+    if (d.time < heartNext) return;
+    heartNext = d.time + 0.6 + (r / 0.32) * 0.6;
+    NS.Audio.play('heart');
+  }
+
   function updateHud(d) {
     if (AUTOTEST) {
       autoFrames++;
@@ -339,7 +437,13 @@
       $('boss-floor').textContent = 'L' + d.boss.floor;
       $('boss-hp-text').textContent = Math.round(d.boss.ratio * 100) + '%';
       $('boss-fill').style.width = (d.boss.ratio * 100) + '%';
-    } else bh.classList.add('hidden');
+      /* v10：血条颜色跟随狂暴阶段，配合 50% / 22% 刻度线，阶段跃迁可预判 */
+      bh.classList.toggle('enraged', d.boss.ratio <= 0.5);
+      bh.classList.toggle('critical', d.boss.ratio <= 0.22);
+    } else {
+      bh.classList.add('hidden');
+      bh.classList.remove('enraged', 'critical');
+    }
 
     /* v6：首领词缀标签（壁垒 / 噬主 / 崩解 …），只在变化时重建 DOM */
     var affs = d.bossAffixes || [];
@@ -535,13 +639,68 @@
     if (fill) {
       $('set-volume').value = Math.round(s.volume * 100);
       $('set-volume-val').textContent = Math.round(s.volume * 100) + '%';
+      if ($('set-music-vol')) {
+        var mv = s.musicVol == null ? 0.9 : s.musicVol;
+        $('set-music-vol').value = Math.round(mv * 100);
+        $('set-music-vol-val').textContent = Math.round(mv * 100) + '%';
+      }
+      if ($('set-music-on')) $('set-music-on').checked = s.musicOn !== false;
+      if ($('set-muted')) $('set-muted').checked = s.muted === true;
       $('set-quality').value = s.quality;
       $('set-shake').checked = !!s.shake;
       $('set-bloom').checked = s.bloom !== false;
       if ($('set-fps')) $('set-fps').value = s.fps || 'auto';
     }
+    NS.Audio.setMusicVolume(s.musicVol == null ? 0.9 : s.musicVol);
+    NS.Audio.setMusicEnabled(s.musicOn !== false);
+    NS.Audio.setMute(s.muted === true);
     U.Save.save();
   }
+  $('set-music-vol').addEventListener('input', function () {
+    save.settings.musicVol = Number(this.value) / 100;
+    if ($('set-music-vol-val')) $('set-music-vol-val').textContent = this.value + '%';
+    NS.Audio.setMusicVolume(save.settings.musicVol);
+    U.Save.save();
+  });
+  $('set-music-on').addEventListener('change', function () {
+    save.settings.musicOn = this.checked;
+    NS.Audio.setMusicEnabled(this.checked);
+    U.Save.save();
+  });
+  if ($('set-muted')) $('set-muted').addEventListener('change', function () {
+    save.settings.muted = this.checked;
+    NS.Audio.setMute(this.checked);
+    U.Save.save();
+  });
+
+  /* v10：恢复默认设置（只重置音频/画质/帧率，不动账号与纪录） */
+  if ($('btn-reset-settings')) $('btn-reset-settings').addEventListener('click', function () {
+    save.settings.volume = 0.85;
+    save.settings.musicVol = 0.9;
+    save.settings.musicOn = true;
+    save.settings.muted = false;
+    save.settings.quality = 'high';
+    save.settings.bloom = true;
+    save.settings.shake = true;
+    save.settings.fps = 'auto';
+    if (NS.Perf && NS.Perf.setMode) NS.Perf.setMode('auto');
+    applySettings(true);
+    showToast('已恢复默认设置', false, true);
+    NS.Audio.play('select');
+  });
+
+  /* v10：清除本机全部存档（二次确认，纯本地数据，不影响其他设备） */
+  if ($('btn-wipe-save')) $('btn-wipe-save').addEventListener('click', function () {
+    if (!root.confirm('确定清除本机全部存档？账号、超频核心、研究所等级与所有纪录都会删除。')) return;
+    if (!root.confirm('再次确认：该操作无法恢复，只影响这台设备。')) return;
+    try {
+      if (root.localStorage) {
+        root.localStorage.removeItem('neon_survivors_v1');
+        root.localStorage.removeItem('os_accounts_v1');
+      }
+    } catch (e) { /* 隐私模式容错 */ }
+    root.location.reload();
+  });
   $('set-volume').addEventListener('input', function () {
     save.settings.volume = Number(this.value) / 100;
     $('set-volume-val').textContent = this.value + '%';
@@ -583,6 +742,30 @@
   $('btn-quit').addEventListener('click', function () { game.toMenu(); });
   $('btn-again').addEventListener('click', startGame);
   $('btn-menu').addEventListener('click', function () { game.toMenu(); });
+
+  /* v10：一键复制本局战绩，方便发给朋友 / 贴到群里 */
+  if ($('btn-share')) $('btn-share').addEventListener('click', function () {
+    var r = game.result || {};
+    var txt = '【超频幸存者】第 ' + (r.floor || 1) + ' 层 · ' + (r.score || 0) + ' 分 · 击杀 ' +
+      (r.kills || 0) + ' · 击破首领 ' + (r.bossKills || 0) + ' 只 · 存活 ' + U.fmtTime(r.time || 0) +
+      '。试玩：https://apexf-prog.github.io/overclock-survivors/';
+    function fallback() {
+      try {
+        var ta = doc.createElement('textarea');
+        ta.value = txt;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        doc.body.appendChild(ta); ta.select();
+        doc.execCommand('copy');
+        doc.body.removeChild(ta);
+        showToast('战绩已复制', false, true);
+      } catch (e) { showToast('复制失败，请手动截图', true); }
+    }
+    if (root.navigator && root.navigator.clipboard && root.navigator.clipboard.writeText) {
+      root.navigator.clipboard.writeText(txt).then(function () {
+        showToast('战绩已复制 · 直接粘贴给朋友', false, true);
+      }, fallback);
+    } else fallback();
+  });
   $('btn-account').addEventListener('click', function () {
     if (game.state !== 'menu' && game.state !== 'result') game.toMenu();
     setScreen('menu');
@@ -595,6 +778,7 @@
     if (e.repeat) return;
     if (NS.Portal && NS.Portal.isOpen()) return;   // 登录门户打开时由门户接管
     var c = e.code;
+    if (c === 'KeyM') { toggleMute(); return; }     // v10：随时静音，任何界面都生效
     if (game.state === 'contract') {
       var ci = (c === 'Digit1' || c === 'Numpad1') ? 0 :
                (c === 'Digit2' || c === 'Numpad2') ? 1 :
@@ -660,6 +844,18 @@
   joy.addEventListener('touchcancel', endJoy);
   $('btn-dash-touch').addEventListener('click', function () { game.tryDash(); });
   $('btn-ult-touch').addEventListener('click', function () { game.tryUltimate(); });
+
+  /* v10：回到主菜单后恢复菜单音乐（旧版 stopMusic 之后就再也没响过） */
+  var _toMenu = game.toMenu;
+  game.toMenu = function () {
+    _toMenu.call(this);
+    try { NS.Audio.music('menu'); } catch (e) { /* 音频异常不影响返回 */ }
+  };
+
+  /* v10：切标签页 / 最小化自动暂停，避免回来时已经被围死 */
+  doc.addEventListener('visibilitychange', function () {
+    if (doc.hidden && game.state === 'playing') game.pause();
+  });
 
   root.addEventListener('resize', function () { game.resize(); });
 

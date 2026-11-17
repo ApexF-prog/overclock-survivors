@@ -119,7 +119,7 @@
   var KEY = 'neon_survivors_v1';
   var DEFAULTS = {
     bestScore: 0, bestTime: 0, bestFloor: 0, totalKills: 0, totalRuns: 0, wins: 0,
-    settings: { volume: 0.6, shake: true, quality: 'high', bloom: true, fps: 'auto' }
+    settings: { volume: 0.85, shake: true, quality: 'high', bloom: true, fps: 'auto', musicVol: 0.9, musicOn: true, muted: false }
   };
   U.Save = {
     data: null,
@@ -135,6 +135,18 @@
       } catch (e) { /* 使用默认值 */ }
       this.data = d;
       return d;
+    },
+    /* 只读取磁盘上的设置，不替换 data 引用 —— 其它模块（门户等）读配置时用这个，
+       否则会把 ui.js 持有的 save 引用换成新对象，之后的设置写入就丢了 */
+    peek: function () {
+      try {
+        var raw = root.localStorage && root.localStorage.getItem(KEY);
+        if (raw) {
+          var p = JSON.parse(raw);
+          if (p && p.settings) return p.settings;
+        }
+      } catch (e) { /* 忽略 */ }
+      return this.data ? this.data.settings : DEFAULTS.settings;
     },
     save: function () {
       try { if (root.localStorage) root.localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { /* 忽略 */ }

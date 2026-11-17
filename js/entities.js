@@ -69,7 +69,7 @@
     this.regen = 0.4; this.armor = 0; this.extraProj = 0; this.xpMul = 1;
     this.dashCdMax = 3.2;
     this.dashCd = 0; this.dashTime = 0; this.invuln = 0;
-    this.level = 1; this.xp = 0; this.xpNeed = 8;
+    this.level = 1; this.xp = 0; this.xpNeed = 12;
     this.weapons = [];
     this.passives = {};
   }
@@ -298,9 +298,10 @@
   NS.floorScale = function (floor) {
     var k = Math.max(0, (floor || 1) - 1);
     return {
-      hp: 1 + k * 0.75 + Math.pow(k, 1.35) * 0.18,
-      speed: Math.min(1.55, 1 + k * 0.05),
-      damage: Math.min(3.4, 1 + k * 0.26)
+      /* v10：小怪成长大幅加强，深层不再「一碰就碎」 */
+      hp: 1 + k * 1.05 + Math.pow(k, 1.45) * 0.32,
+      speed: Math.min(1.72, 1 + k * 0.062),
+      damage: Math.min(4.6, 1 + k * 0.33)
     };
   };
 })(typeof window !== 'undefined' ? window : globalThis);

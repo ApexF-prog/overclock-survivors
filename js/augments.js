@@ -325,7 +325,8 @@
       else this.hex.sincePrism++;
       a.apply(this, lv);
       this.onEvent('toast', { text: '海克斯强化 // ' + a.name, long: true });
-      A.play(a.tier === 'silver' ? 'select' : 'evolve');
+      /* 品质决定音色：银 / 金 / 棱彩三档，棱彩最华丽 */
+      A.play(a.tier === 'prismatic' ? 'hexPrism' : (a.tier === 'gold' ? 'hexGold' : 'hexPick'));
       this.fx.addFlash(a.tier === 'prismatic' ? 0.32 : 0.20,
         a.tier === 'prismatic' ? '255,122,224' : '180,240,255');
     } else {
@@ -341,15 +342,17 @@
         p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.4);
         this.score += 200;
       }
-      A.play('select');
+      A.play('hexPick');
     }
     this.pendingLevels--;
     if (this.pendingLevels > 0) {
       this._choices = this.getChoices();
+      A.play('hexOpen');
       this.onEvent('levelup', { choices: this._choices, level: this.player.level });
     } else {
       this.state = 'playing';
-      NS.Audio.setPaused(false);
+      NS.Audio.duckMusic(false);
+      NS.Audio.setSfxPaused(false);
       /* 短暂防被贴身秒掉；高层升级频繁，缩短到 0.4s 避免累计成常驻无敌 */
       this.player.invuln = Math.max(this.player.invuln, 0.4);
       this.onEvent('resume', {});
@@ -362,7 +365,7 @@
     this.rerolls--;
     this._choices = this.getChoices();
     this.onEvent('levelup', { choices: this._choices, level: this.player.level });
-    A.play('select');
+    A.play('reroll');
     this.fx.addFlash(0.12, '180,240,255');
     return true;
   };

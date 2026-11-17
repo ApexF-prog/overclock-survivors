@@ -260,6 +260,8 @@
   G.drawEnemies = function (ctx) {
     var a = this.enemies || [], glow = this.fx.glow, t = this.time, p = this.player;
     var cam = this.cam, W = this.W, H = this.H;
+    /* v10：怪物形态随层数进化（每 3 层升一档），越深越狰狞 */
+    var mobTier = Math.min(3, Math.floor(((this.floor || 1) - 1) / 3));
     var mx = cam.x - 70, my = cam.y - 70, MX = cam.x + W + 70, MY = cam.y + H + 70;
     for (var i = 0; i < a.length; i++) {
       var e = a[i];
@@ -334,26 +336,158 @@
             ctx.beginPath(); ctx.arc(Math.cos(sa) * r * 0.48, Math.sin(sa) * r * 0.48, r * 0.17, 0, TAU); ctx.fill();
           }
           break;
-        case 6: /* 首领 */
+        case 6: /* 首领：按层数轮换四种怪兽形态 */
+          var arch = e.arch || 0, ph = e.phase;
           ctx.save(); ctx.rotate(e.t * 0.45);
-          ctx.globalAlpha = 0.35; ctx.lineWidth = 3;
-          poly(ctx, 8, r * 1.42, -e.t * 0.8); ctx.stroke();
-          ctx.globalAlpha = 0.7; ctx.lineWidth = 1.5;
-          poly(ctx, 12, r * 1.22, e.t * 0.6); ctx.stroke();
+          ctx.globalAlpha = 0.30; ctx.lineWidth = 3;
+          poly(ctx, 8, r * 1.45, -e.t * 0.8); ctx.stroke();
+          ctx.globalAlpha = 0.65; ctx.lineWidth = 1.5;
+          poly(ctx, 12, r * 1.24, e.t * 0.6); ctx.stroke();
           ctx.restore();
-          poly(ctx, 6, r, 0); ctx.fill();
-          ctx.fillStyle = '#1a0410'; poly(ctx, 6, r * 0.68, 0); ctx.fill();
-          ctx.fillStyle = e.phase ? '#ffe14d' : '#ffffff';
-          ctx.beginPath(); ctx.arc(0, 0, r * 0.24 + Math.sin(e.t * 5) * 2.5, 0, TAU); ctx.fill();
-          ctx.strokeStyle = e.phase ? '#ffe14d' : '#ff8ac4';
-          ctx.lineWidth = 2.5; ctx.globalAlpha = 0.8;
-          for (var h = 0; h < 6; h++) {
-            var ha = h * TAU / 6 + e.t * 0.45;
+          ctx.save(); ctx.rotate(pa);
+          var iris = ph ? '#ffe14d' : (arch === 1 ? '#ff7ae0' : (arch === 3 ? '#7dffb0' : '#ff5c7a'));
+          if (arch === 0) {
+            /* 巨口兽：楔形头 + 会张合的大嘴 + 两排獠牙 */
             ctx.beginPath();
-            ctx.moveTo(Math.cos(ha) * r * 0.95, Math.sin(ha) * r * 0.95);
-            ctx.lineTo(Math.cos(ha) * r * 1.32, Math.sin(ha) * r * 1.32);
-            ctx.stroke();
+            ctx.moveTo(r * 1.42, 0);
+            ctx.lineTo(r * 0.30, -r * 1.18);
+            ctx.lineTo(-r * 1.06, -r * 0.80);
+            ctx.quadraticCurveTo(-r * 1.40, 0, -r * 1.06, r * 0.80);
+            ctx.lineTo(r * 0.30, r * 1.18);
+            ctx.closePath(); ctx.fill();
+            var jaw = 0.16 + Math.abs(Math.sin(e.t * 1.8)) * 0.34;
+            ctx.fillStyle = '#1a0008';
+            ctx.beginPath();
+            ctx.moveTo(r * 1.20, 0);
+            ctx.lineTo(r * 0.10, -Math.sin(jaw) * r * 0.95);
+            ctx.lineTo(r * 0.10, Math.sin(jaw) * r * 0.95);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#fff6dc';
+            for (var th = 0; th < 5; th++) {
+              var tt = 0.22 + th * 0.16;
+              var tx = r * (1.20 - tt * r * 0.78);
+              var ty = Math.sin(jaw) * r * 0.92 * (1 - tt * 0.85);
+              ctx.beginPath(); ctx.moveTo(tx, -ty); ctx.lineTo(tx - r * 0.10, -ty * 0.45); ctx.lineTo(tx - r * 0.02, -ty * 0.92); ctx.closePath(); ctx.fill();
+              ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - r * 0.10, ty * 0.45); ctx.lineTo(tx - r * 0.02, ty * 0.92); ctx.closePath(); ctx.fill();
+            }
+            ctx.fillStyle = iris;
+            ctx.beginPath(); ctx.arc(-r * 0.35, -r * 0.52, r * 0.16, 0, TAU); ctx.fill();
+            ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.52, r * 0.16, 0, TAU); ctx.fill();
+            ctx.fillStyle = '#12000a';
+            ctx.beginPath(); ctx.arc(-r * 0.35, -r * 0.52, r * 0.07, 0, TAU); ctx.fill();
+            ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.52, r * 0.07, 0, TAU); ctx.fill();
+          } else if (arch === 1) {
+            /* 多眼体：球体 + 眼球群 + 摆动的触须 */
+            ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+            ctx.fillStyle = '#160018';
+            ctx.beginPath(); ctx.arc(0, 0, r * 0.72, 0, TAU); ctx.fill();
+            ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, r * 0.10);
+            ctx.globalAlpha = 0.75;
+            for (var tb2 = 0; tb2 < 6; tb2++) {
+              var ta2 = tb2 * TAU / 6 + Math.sin(e.t * 2.4 + tb2) * 0.22;
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(ta2) * r * 0.85, Math.sin(ta2) * r * 0.85);
+              ctx.quadraticCurveTo(Math.cos(ta2) * r * 1.35, Math.sin(ta2) * r * 1.35,
+                                   Math.cos(ta2 + 0.25) * r * 1.75, Math.sin(ta2 + 0.25) * r * 1.75);
+              ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+            for (var ey = 0; ey < 7; ey++) {
+              var ea = ey * TAU / 7 + e.t * 0.6;
+              var er = ey === 0 ? r * 0.34 : r * 0.72;
+              var es = ey === 0 ? r * 0.30 : r * 0.17;
+              ctx.fillStyle = '#fff8e8';
+              ctx.beginPath(); ctx.arc(Math.cos(ea) * er, Math.sin(ea) * er, es, 0, TAU); ctx.fill();
+              ctx.fillStyle = iris;
+              ctx.beginPath(); ctx.arc(Math.cos(ea) * er, Math.sin(ea) * er, es * 0.6, 0, TAU); ctx.fill();
+              ctx.fillStyle = '#0b0010';
+              ctx.beginPath(); ctx.arc(Math.cos(ea) * er, Math.sin(ea) * er, es * 0.28, 0, TAU); ctx.fill();
+            }
+          } else if (arch === 2) {
+            /* 蛛形：甲壳 + 八条节肢 + 螯牙 */
+            ctx.fillStyle = col;
+            for (var lg = 0; lg < 8; lg++) {
+              var side = lg % 2 ? 1 : -1, li = Math.floor(lg / 2);
+              var la = (-0.9 + li * 0.6) * side;
+              var sway = Math.sin(e.t * 6 + lg) * 0.18;
+              var kx1 = Math.cos(la) * r * 1.15, ky1 = Math.sin(la) * r * 1.15;
+              var kx2 = Math.cos(la + sway) * r * 1.95, ky2 = Math.sin(la + sway) * r * 1.95;
+              ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, r * 0.14);
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(la) * r * 0.55, Math.sin(la) * r * 0.55);
+              ctx.lineTo(kx1, ky1);
+              ctx.lineTo(kx2, ky2);
+              ctx.stroke();
+            }
+            ctx.fillStyle = col;
+            ctx.beginPath(); ctx.ellipse(0, 0, r * 0.95, r * 0.82, 0, 0, TAU); ctx.fill();
+            ctx.fillStyle = '#1a0614';
+            ctx.beginPath(); ctx.ellipse(r * 0.12, 0, r * 0.66, r * 0.54, 0, 0, TAU); ctx.fill();
+            ctx.fillStyle = iris;
+            ctx.beginPath(); ctx.arc(r * 0.52, -r * 0.26, r * 0.14, 0, TAU); ctx.fill();
+            ctx.beginPath(); ctx.arc(r * 0.52, r * 0.26, r * 0.14, 0, TAU); ctx.fill();
+            ctx.strokeStyle = '#fff2d4'; ctx.lineWidth = Math.max(2, r * 0.10);
+            for (var mg = 0; mg < 2; mg++) {
+              var ms = mg ? 1 : -1;
+              ctx.beginPath();
+              ctx.moveTo(r * 0.72, ms * r * 0.22);
+              ctx.quadraticCurveTo(r * 1.18, ms * r * 0.40, r * 1.34, ms * r * 0.06);
+              ctx.stroke();
+            }
+          } else {
+            /* 蛇形：分节躯体 + 三角蛇头 + 分叉信子 */
+            ctx.fillStyle = col;
+            for (var sg = 5; sg >= 1; sg--) {
+              var sd = r * 0.62 * sg;
+              var off = Math.sin(e.t * 3.2 - sg * 0.7) * r * 0.30;
+              ctx.globalAlpha = 0.85 - sg * 0.07;
+              ctx.beginPath();
+              ctx.ellipse(-sd, off, r * (0.72 - sg * 0.07), r * (0.56 - sg * 0.05), 0, 0, TAU); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.moveTo(r * 1.34, 0);
+            ctx.lineTo(-r * 0.10, -r * 0.86);
+            ctx.lineTo(-r * 0.62, 0);
+            ctx.lineTo(-r * 0.10, r * 0.86);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#0d1a10';
+            ctx.beginPath();
+            ctx.moveTo(r * 1.20, 0); ctx.lineTo(-r * 0.02, -r * 0.48);
+            ctx.lineTo(-r * 0.02, r * 0.48); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = iris;
+            ctx.beginPath(); ctx.arc(r * 0.42, -r * 0.32, r * 0.15, 0, TAU); ctx.fill();
+            ctx.beginPath(); ctx.arc(r * 0.42, r * 0.32, r * 0.15, 0, TAU); ctx.fill();
+            var fl = Math.sin(e.t * 9);
+            if (fl > 0.2) {
+              ctx.strokeStyle = '#ff5c7a'; ctx.lineWidth = Math.max(1.6, r * 0.07);
+              ctx.beginPath();
+              ctx.moveTo(r * 1.30, 0); ctx.lineTo(r * 1.60, 0);
+              ctx.moveTo(r * 1.60, 0); ctx.lineTo(r * 1.78, -r * 0.14);
+              ctx.moveTo(r * 1.60, 0); ctx.lineTo(r * 1.78, r * 0.14);
+              ctx.stroke();
+            }
           }
+          /* 进化世代：额外棘刺 + 外环裂纹，越深的同名形态也不一样 */
+          if (e.gen > 0) {
+            ctx.strokeStyle = col; ctx.lineWidth = 2.2;
+            ctx.globalAlpha = 0.75;
+            var spikes = 6 + e.gen * 2;
+            for (var gs = 0; gs < spikes; gs++) {
+              var ga = gs * TAU / spikes + e.t * 0.5;
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(ga) * r * 1.02, Math.sin(ga) * r * 1.02);
+              ctx.lineTo(Math.cos(ga + 0.06) * r * (1.32 + e.gen * 0.06), Math.sin(ga + 0.06) * r * (1.32 + e.gen * 0.06));
+              ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+          }
+          /* 核心光点（狂暴时更亮） */
+          ctx.fillStyle = ph ? '#ffe14d' : '#ffffff';
+          ctx.globalAlpha = 0.55 + Math.sin(e.t * 5) * 0.25;
+          ctx.beginPath(); ctx.arc(0, 0, r * 0.16, 0, TAU); ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.restore();
           break;
         case 7: /* 冲锋兵：带蓄力尖角 */
           ctx.rotate(pa);
@@ -406,6 +540,50 @@
             ctx.lineTo(Math.cos(spa + 0.25) * r * 0.9, Math.sin(spa + 0.25) * r * 0.9);
             ctx.closePath(); ctx.fill();
           }
+      }
+      /* v10：怪兽五官 —— 眼睛常朝玩家，随层数长出獠牙 / 甲刺 / 触须 */
+      if (!e.boss) {
+        ctx.save();
+        ctx.rotate(pa);
+        var eyeR = Math.max(1.5, r * 0.20);
+        ctx.fillStyle = '#fff8e0';
+        ctx.beginPath(); ctx.arc(r * 0.40, -r * 0.24, eyeR, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.40, r * 0.24, eyeR, 0, TAU); ctx.fill();
+        ctx.fillStyle = mobTier >= 3 ? '#ff2f6e' : (mobTier >= 2 ? '#ffcf4d' : '#22e6ff');
+        ctx.beginPath(); ctx.arc(r * 0.46, -r * 0.24, eyeR * 0.55, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.46, r * 0.24, eyeR * 0.55, 0, TAU); ctx.fill();
+        if (mobTier >= 1) {
+          ctx.strokeStyle = '#f4f9ff'; ctx.lineWidth = Math.max(1, r * 0.10);
+          ctx.beginPath();
+          ctx.moveTo(r * 0.66, -r * 0.40); ctx.lineTo(r * 1.04, -r * 0.12);
+          ctx.moveTo(r * 0.66, r * 0.40); ctx.lineTo(r * 1.04, r * 0.12);
+          ctx.stroke();
+        }
+        if (mobTier >= 2) {
+          ctx.fillStyle = col;
+          for (var msp = 0; msp < 5; msp++) {
+            var msa = -Math.PI * 0.80 + msp * 0.40;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(msa) * r * 0.88, Math.sin(msa) * r * 0.88);
+            ctx.lineTo(Math.cos(msa) * r * 1.46, Math.sin(msa) * r * 1.46);
+            ctx.lineTo(Math.cos(msa + 0.17) * r * 0.88, Math.sin(msa + 0.17) * r * 0.88);
+            ctx.closePath(); ctx.fill();
+          }
+        }
+        if (mobTier >= 3) {
+          ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.2, r * 0.13);
+          ctx.globalAlpha = 0.85;
+          for (var mtb = 0; mtb < 3; mtb++) {
+            var mta = Math.PI * (0.72 + mtb * 0.28) + Math.sin(t * 4 + mtb + e.id) * 0.16;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(mta) * r * 0.86, Math.sin(mta) * r * 0.86);
+            ctx.quadraticCurveTo(Math.cos(mta) * r * 1.48, Math.sin(mta) * r * 1.48,
+                                 Math.cos(mta + 0.22) * r * 1.92, Math.sin(mta + 0.22) * r * 1.92);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+        ctx.restore();
       }
       ctx.restore();
 

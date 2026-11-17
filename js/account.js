@@ -33,7 +33,7 @@
   function blank() {
     return {
       bestScore: 0, bestTime: 0, bestFloor: 0, totalKills: 0, totalRuns: 0, wins: 0,
-      settings: { volume: 0.6, shake: true, quality: 'high', bloom: true, fps: 'auto' }
+      settings: { volume: 0.85, shake: true, quality: 'high', bloom: true, fps: 'auto', musicVol: 0.9, musicOn: true, muted: false }
     };
   }
   function merge(dst, src) {

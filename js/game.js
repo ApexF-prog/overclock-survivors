@@ -94,7 +94,8 @@
     NS.Audio.init(this.volume);
     NS.Audio.resume();
     NS.Audio.setPaused(false);
-    NS.Audio.startMusic();
+    NS.Audio.duckMusic(false);
+    NS.Audio.startMusic('battle');
     NS.Audio.play('start');
     this.onEvent('start', {});
   };
@@ -319,8 +320,10 @@
 
     if (this.pendingLevels > 0 && this.state === 'playing') {
       this.state = 'levelup';
-      NS.Audio.setPaused(true);
+      /* 只压低音乐、不静音音效：否则三选一的提示音会被自己掐掉（旧 bug） */
+      NS.Audio.duckMusic(true);
       NS.Audio.play('levelup');
+      NS.Audio.play('hexOpen');
       this._choices = this.getChoices();
       this.onEvent('levelup', { choices: this._choices, level: p.level });
     }
@@ -377,11 +380,22 @@
     var e = new NS.Enemy('boss', p.x + Math.cos(a) * dist, p.y + Math.sin(a) * dist,
       1 + this.bossIndex * 0.55, 1 + this.time / 900);
     e.name = D.bossNames[Math.min(D.bossNames.length - 1, this.bossIndex - 1)];
+    /* v10：每层首领换一种怪物形态（0 巨口兽 / 1 多眼体 / 2 蛛形 / 3 蛇形），
+     * 第 5 层起进入下一世代：换配色并长出额外棘刺，避免「同一个 BOSS 无限重复」 */
+    e.arch = (this.bossIndex - 1) % 4;
+    e.gen = Math.floor((this.bossIndex - 1) / 4);
+    if (e.gen > 0) {
+      var PAL = ['#ff2f8e', '#38d6ff', '#ffb03a', '#a06bff'];
+      e.color = PAL[e.gen % PAL.length];
+    }
     this.enemies.push(e);
     this.boss = e;
     this.fx.addFlash(0.35, '255,60,140');
     this.fx.addShake(12);
+    if (this.fx.shock) this.fx.shock(e.x, e.y, 260, '#ff2f8e');
+    else this.fx.ring(e.x, e.y, 10, 240, '#ff2f8e', 5, 0.6);
     NS.Audio.play('boss');
+    NS.Audio.music('boss');
     this.onEvent('toast', { text: 'WARNING // 首领来袭 · ' + e.name, danger: true, long: true });
   };
   Game.prototype.spawnMinions = function (boss, n) {
@@ -447,6 +461,8 @@
           });
         }
         NS.Audio.play('shoot');
+        /* 枪口闪光：让每次开火都有可见的起手反馈 */
+        this.fx.spark(p.x + Math.cos(ang) * 20, p.y + Math.sin(ang) * 20, '#9df6ff', 3, 170, 0.14, 2.4);
         break;
       }
       case 'missile': {
@@ -605,7 +621,15 @@
     var dense = this.enemies.length > 55, perf = this.perfLevel || 0;
     var showText = !dense || crit || d > 45 || Math.random() < (perf > 0 ? 0.08 : 0.22);
     if (showText) this.fx.text(e.x, e.y - e.radius, String(Math.round(d)), crit ? '#ffe14d' : '#eaf6ff', crit ? 14 : 12, crit);
-    if (this.fx.glow && (!dense || Math.random() < 0.16)) this.fx.spark(e.x, e.y, color || '#ffffff', 3, 130, 0.22, 2.2);
+    /* 暴击：额外金色迸溅 + 小冲击环 + 顿帧感，打击反馈更明确 */
+    if (crit && (!dense || Math.random() < 0.5)) {
+      this.fx.spark(e.x, e.y, '#ffe14d', 8, 300, 0.34, 3.2);
+      this.fx.ring(e.x, e.y, 3, 34, '#ffe14d', 2.5, 0.28);
+      this.fx.addShake(1.8, kx, ky);
+      NS.Audio.play('hit');
+    } else if (this.fx.glow && (!dense || Math.random() < 0.16)) {
+      this.fx.spark(e.x, e.y, color || '#ffffff', 3, 130, 0.22, 2.2);
+    }
     if (!dense || Math.random() < 0.12) NS.Audio.play('hit');
     if (e.hp <= 0) this.killEnemy(e);
   };
@@ -623,6 +647,11 @@
       this.fx.addFlash(0.55, '255,60,140');
       this.fx.text(e.x, e.y - 70, 'BOSS DOWN', '#ffe14d', 22, true);
       this.hitstop = 0.06;
+      /* 首领死亡：三重冲击波 + 慢动作，收束感更强 */
+      if (this.fx.shock) this.fx.shock(e.x, e.y, 300, '#ffb03a');
+      this.fx.ring(e.x, e.y, 20, 380, '#ffe14d', 4, 0.75);
+      this.fx.addShake(9);
+      NS.Audio.music('battle');
       NS.Audio.play('explode');
       this.onEvent('toast', {
         text: this.bossStartAt
@@ -674,7 +703,7 @@
     while (p.xp >= p.xpNeed) {
       p.xp -= p.xpNeed;
       p.level++;
-      p.xpNeed = Math.floor(8 + Math.pow(p.level, 1.45) * 2.2);
+      p.xpNeed = Math.floor(12 + Math.pow(p.level, 1.85) * 6);
       this.pendingLevels++;
     }
   };

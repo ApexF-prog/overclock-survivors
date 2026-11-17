@@ -579,3 +579,51 @@ button,select,input{font-family:inherit}
   .p-feats span{font-size:10px}
   .p-diff-list{grid-template-columns:repeat(2,1fr)}
 }
+
+/* ============ v10 · 体验补强 ============ */
+/* 首领血条狂暴刻度：50% 进入二阶段、22% 进入三阶段，可预判 */
+.boss-bar{position:relative;overflow:visible}
+.phase-tick{position:absolute;top:-3px;bottom:-3px;width:1px;background:rgba(255,220,120,.55);
+  box-shadow:0 0 6px rgba(255,200,80,.6);pointer-events:none}
+.phase-tick.crit{background:rgba(255,90,110,.8);box-shadow:0 0 8px rgba(255,60,90,.8)}
+.phase-tick::after{content:'';position:absolute;left:-2px;top:-3px;width:5px;height:3px;
+  background:currentColor;color:rgba(255,220,120,.7)}
+.boss-hud.enraged .boss-bar{border-color:rgba(255,120,60,.7)}
+.boss-hud.enraged .boss-bar .bar-fill{background:linear-gradient(90deg,#ff6a00,#ffd24d);
+  box-shadow:0 0 18px rgba(255,140,40,.85)}
+.boss-hud.enraged .boss-name{color:#ffd9a0;text-shadow:0 0 14px rgba(255,140,40,.8)}
+.boss-hud.critical .boss-bar .bar-fill{background:linear-gradient(90deg,#ff2d55,#ff8a3d);
+  animation:hpPulse .7s ease-in-out infinite}
+@keyframes hpPulse{50%{filter:brightness(1.45)}}
+
+/* 暂停面板：本局构筑快照 */
+.pause-info{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 18px}
+.pause-cell{background:rgba(8,16,32,.72);border:1px solid var(--line);border-radius:6px;padding:8px 6px;text-align:center}
+.pause-cell span{display:block;font-size:10px;letter-spacing:1px;color:var(--muted);margin-bottom:3px}
+.pause-cell b{font-size:14px;font-family:Consolas,monospace;color:var(--cyan)}
+.pause-build{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:5px;justify-content:center;
+  background:transparent;border:none;padding:2px 0}
+.pause-chip{font-size:10px;padding:3px 8px;border-radius:10px;border:1px solid rgba(120,180,255,.25);
+  color:#bcd7f0;background:rgba(12,22,40,.8)}
+.pause-chip.syn{border-color:rgba(180,140,255,.45);color:#d9c6ff}
+
+/* 开局操作提示：只在每局前几秒出现，不打断老玩家 */
+.control-hint{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);
+  padding:8px 18px;border-radius:20px;font-size:12px;letter-spacing:1px;color:#cfe9ff;
+  background:rgba(6,14,28,.82);border:1px solid rgba(90,190,230,.35);
+  box-shadow:0 0 24px rgba(34,230,255,.18);opacity:0;transition:opacity .35s;pointer-events:none;white-space:nowrap}
+.control-hint.on{opacity:1}
+.control-hint b{color:var(--cyan)}
+
+/* 设置页危险操作 */
+.set-danger{display:flex;gap:10px;margin-top:16px}
+.btn-sm{padding:7px 14px;font-size:12px}
+.btn-danger{border-color:rgba(255,90,120,.5);color:#ff9ab0}
+.btn-danger:hover{background:rgba(255,60,90,.14);border-color:rgba(255,90,120,.8)}
+.help-note.dim{color:#5d7590;font-size:10px;margin-top:8px}
+
+@media (max-width:520px){
+  .pause-info{grid-template-columns:repeat(2,1fr)}
+  .control-hint{bottom:150px;font-size:11px;padding:7px 12px;white-space:normal;text-align:center;max-width:88vw}
+  .set-danger{flex-direction:column}
+}
