@@ -1,5 +1,12 @@
 # 超频幸存者 · OVERCLOCK SURVIVORS v9 · 无尽炼狱
 
+[![在线试玩](https://img.shields.io/badge/%E2%96%B6%20%E5%9C%A8%E7%BA%BF%E8%AF%95%E7%8E%A9-PLAY-22e6ff?style=for-the-badge)](https://apexf-prog.github.io/overclock-survivors/)
+[![Repo](https://img.shields.io/badge/GitHub-overclock--survivors-181717?style=for-the-badge&logo=github)](https://github.com/ApexF-prog/overclock-survivors)
+![零依赖](https://img.shields.io/badge/dependencies-0-6ef0a4?style=for-the-badge)
+![纯原生](https://img.shields.io/badge/Vanilla%20JS-Canvas%202D-ffcc4d?style=for-the-badge)
+
+> **🌐 在线试玩：<https://apexf-prog.github.io/overclock-survivors/>** —— 手机 / 电脑浏览器直接打开，无需安装。
+
 零依赖的 HTML5 Canvas 俯视角生存射击游戏。**双击 `index.html` 即可游玩** —— 不需要安装、不需要联网、不需要本地服务器、没有任何图片或音频素材文件（画面全部实时绘制，声音全部由 Web Audio 实时合成）。
 
 v9 聚焦两件事：**性能**与**可展示的工程亮点**。新增 **帧率档位（自动/60/90/120/144）+ 动态分辨率 + 渲染负载自适应**，专门解决密集场景卡顿；新增 **每日挑战**（日期确定性同题 + 独立日榜）与 **超武进化图鉴**（跨局解锁进度）。此前 v8 加入 **海克斯羁绊系统**、v7 **超频研究所**、v6 **4399 风格登录门户**、v4 起为 **无尽炼狱**（一层一层往下打，每层都有首领，强度逐层递增，没有终点，只有阵亡）。
